@@ -2,6 +2,9 @@
 
 namespace Arionum\Arionum;
 
+/**
+ * Class Transaction
+ */
 class Transaction
 {
     // reverse and remove all transactions from a block

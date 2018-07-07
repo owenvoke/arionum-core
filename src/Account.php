@@ -2,6 +2,9 @@
 
 namespace Arionum\Arionum;
 
+/**
+ * Class Account
+ */
 class Account
 {
     /**

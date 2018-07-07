@@ -2,6 +2,9 @@
 
 namespace Arionum\Arionum;
 
+/**
+ * Class Block
+ */
 class Block
 {
     public function add($height, $public_key, $nonce, $data, $date, $signature, $difficulty, $reward_signature, $argon)
