@@ -268,13 +268,13 @@ function coinToPem(string $data, $isPrivateKey = false)
 function ecSign($data, string $key)
 {
     // Transform the base58 key format to PEM
-    $private_key = coinToPem($key, true);
+    $privateKey = coinToPem($key, true);
 
-    $pkey = openssl_pkey_get_private($private_key);
+    $pKey = openssl_pkey_get_private($privateKey);
 
-    $k = openssl_pkey_get_details($pkey);
+    $k = openssl_pkey_get_details($pKey);
 
-    openssl_sign($data, $signature, $pkey, OPENSSL_ALGO_SHA256);
+    openssl_sign($data, $signature, $pKey, OPENSSL_ALGO_SHA256);
 
     // The signature will be base58 encoded
     return base58Encode($signature);
@@ -289,16 +289,16 @@ function ecSign($data, string $key)
  */
 function ecVerify(string $data, string $signature, string $key)
 {
-    // transform the base58 key to PEM
-    $public_key = coinToPem($key);
+    // Transform the Base58 key to PEM
+    $publicKey = coinToPem($key);
 
     $signature = base58Decode($signature);
 
-    $pkey = openssl_pkey_get_public($public_key);
+    $pKey = openssl_pkey_get_public($publicKey);
 
-    $res = openssl_verify($data, $signature, $pkey, OPENSSL_ALGO_SHA256);
+    $result = openssl_verify($data, $signature, $pKey, OPENSSL_ALGO_SHA256);
 
-    if ($res === 1) {
+    if ($result === 1) {
         return true;
     }
 

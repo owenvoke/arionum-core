@@ -382,7 +382,7 @@ class Block
         ];
 
         ksort($transaction);
-        $reward_signature = $txn->sign($transaction, $privateKey);
+        $rewardSignature = $txn->sign($transaction, $privateKey);
 
         // Add the block to the blockchain
         $res = $this->add(
@@ -393,7 +393,7 @@ class Block
             $date,
             $signature,
             $difficulty,
-            $reward_signature,
+            $rewardSignature,
             $argon
         );
 

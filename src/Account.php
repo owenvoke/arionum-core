@@ -94,17 +94,17 @@ class Account
         openssl_pkey_export($key1, $pvkey);
 
         // Convert the PEM to a Base58 format
-        $private_key = pemToCoin($pvkey);
+        $privateKey = pemToCoin($pvkey);
 
         // Export the private key encoded as PEM
         $pub = openssl_pkey_get_details($key1);
 
         // Convert the PEM to a Base58 format
-        $public_key = pemToCoin($pub['key']);
+        $publicKey = pemToCoin($pub['key']);
 
         // Generate the account's address based on the public key
-        $address = $this->getAddress($public_key);
-        return ["address" => $address, "public_key" => $public_key, "private_key" => $private_key];
+        $address = $this->getAddress($publicKey);
+        return ["address" => $address, "public_key" => $publicKey, "private_key" => $privateKey];
     }
 
     /**
@@ -197,14 +197,14 @@ class Account
         global $db;
         $block = new Block();
         $current = $block->current();
-        $public_key = $this->publicKey($id);
+        $publicKey = $this->publicKey($id);
         $limit = intval($limit);
         if ($limit > 100 || $limit < 1) {
             $limit = 100;
         }
         $res = $db->run(
             "SELECT * FROM transactions WHERE dst=:dst or public_key=:src ORDER by height DESC LIMIT :limit",
-            [":src" => $public_key, ":dst" => $id, ":limit" => $limit]
+            [":src" => $publicKey, ":dst" => $id, ":limit" => $limit]
         );
 
         $transactions = [];
