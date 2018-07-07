@@ -575,7 +575,6 @@ class Block
     // sign a new block, used when mining
     public function sign($generator, $height, $date, $nonce, $data, $key, $difficulty, $argon)
     {
-
         $json = json_encode($data);
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
 
