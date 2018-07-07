@@ -25,29 +25,26 @@ class Account
         $db->run("INSERT ignore INTO accounts SET id=:id, public_key='', block=:block, balance=0", $bind);
     }
 
-    // generates Account's address from the public key
-    public function getAddress($hash)
+    /**
+     * Generate the account's address from the public key.
+     * @param string $publicKey
+     * @return string
+     */
+    public function getAddress(string $publicKey): string
     {
-        //broken base58 addresses, which are block winners, missing the first 0 bytes from the address.
-        if ($hash == 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCwCpspGFGQSaF9yVGLamBgymdf8M7FafghmP3oPzQb3W4PZsZApVa41uQrrHRVBH5p9bdoz7c6XeRQHK2TkzWR45e') {
-            return '22SoB29oyq2JhMxtBbesL7JioEYytyC6VeFmzvBH6fRQrueSvyZfEXR5oR7ajSQ9mLERn6JKU85EAbVDNChke32';
-        } elseif ($hash == 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCzbRyyz5oDNDKhk5jyjg4caRjkbqegMZMrUkuBjVMuYcVfPyc3aKuLmPHS4QEDjCrNGks7Z5oPxwv4yXSv7WJnkbL') {
-            return 'AoFnv3SLujrJSa2J7FDTADGD7Eb9kv3KtNAp7YVYQEUPcLE6cC6nLvvhVqcVnRLYF5BFF38C1DyunUtmfJBhyU';
-        } elseif ($hash == 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCyradtFFJoaYB4QdcXyBGSXjiASMMnofsT4f5ZNaxTnNDJt91ubemn3LzgKrfQh8CBpqaphkVNoRLub2ctdMnrzG1') {
-            return 'RncXQuc7S7aWkvTUJSHEFvYoV3ntAf7bfxEHjSiZNBvQV37MzZtg44L7GAV7szZ3uV8qWqikBewa3piZMqzBqm';
-        } elseif ($hash == 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCyjKMBY4ihhJ2G25EVezg7KnoCBVbhdvWfqzNA4LC5R7wgu3VNfJgvqkCq9sKKZcCoCpX6Qr9cN882MoXsfGTvZoj') {
-            return 'Rq53oLzpCrb4BdJZ1jqQ2zsixV2ukxVdM4H9uvUhCGJCz1q2wagvuXV4hC6UVwK7HqAt1FenukzhVXgzyG1y32';
+        if ($address = $this->isBrokenBlockWinner($publicKey)) {
+            return $address;
         }
 
-        // hashes 9 times in sha512 (binary) and encodes in base58
-        for ($i = 0; $i < 9;
-             $i++) {
-            $hash = hash('sha512', $hash, true);
+        // Hash 9 times in sha512 (binary) and encode with Base58
+        for ($i = 0; $i < 9; $i++) {
+            $publicKey = hash('sha512', $publicKey, true);
         }
-        return base58Encode($hash);
+
+        return base58Encode($publicKey);
     }
 
-    // checks the ecdsa secp256k1 signature for a specific public key
+    // checks the ECDSA secp256k1 signature for a specific public key
     public function checkSignature($data, $signature, $public_key)
     {
         return ecVerify($data, $signature, $public_key);
@@ -235,5 +232,29 @@ class Account
         global $db;
         $res = $db->single("SELECT public_key FROM accounts WHERE id=:id", [":id" => $id]);
         return $res;
+    }
+
+    /**
+     * Check if the public key is in a list of broken block winner addresses.
+     * These were missing the first 0 bytes from the address.
+     * @param string $hash
+     * @return null|string
+     */
+    private function isBrokenBlockWinner(string $hash)
+    {
+        // phpcs:disable Generic.Files.LineLength
+        $brokenAddresses = [
+            'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCwCpspGFGQSaF9yVGLamBgymdf8M7FafghmP3oPzQb3W4PZsZApVa41uQrrHRVBH5p9bdoz7c6XeRQHK2TkzWR45e' => '22SoB29oyq2JhMxtBbesL7JioEYytyC6VeFmzvBH6fRQrueSvyZfEXR5oR7ajSQ9mLERn6JKU85EAbVDNChke32',
+            'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCzbRyyz5oDNDKhk5jyjg4caRjkbqegMZMrUkuBjVMuYcVfPyc3aKuLmPHS4QEDjCrNGks7Z5oPxwv4yXSv7WJnkbL' => 'AoFnv3SLujrJSa2J7FDTADGD7Eb9kv3KtNAp7YVYQEUPcLE6cC6nLvvhVqcVnRLYF5BFF38C1DyunUtmfJBhyU',
+            'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCyradtFFJoaYB4QdcXyBGSXjiASMMnofsT4f5ZNaxTnNDJt91ubemn3LzgKrfQh8CBpqaphkVNoRLub2ctdMnrzG1' => 'RncXQuc7S7aWkvTUJSHEFvYoV3ntAf7bfxEHjSiZNBvQV37MzZtg44L7GAV7szZ3uV8qWqikBewa3piZMqzBqm',
+            'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCyjKMBY4ihhJ2G25EVezg7KnoCBVbhdvWfqzNA4LC5R7wgu3VNfJgvqkCq9sKKZcCoCpX6Qr9cN882MoXsfGTvZoj' => 'Rq53oLzpCrb4BdJZ1jqQ2zsixV2ukxVdM4H9uvUhCGJCz1q2wagvuXV4hC6UVwK7HqAt1FenukzhVXgzyG1y32',
+        ];
+        // phpcs:enable
+
+        if (key_exists($hash, $brokenAddresses)) {
+            return $brokenAddresses[$hash];
+        }
+
+        return null;
     }
 }
