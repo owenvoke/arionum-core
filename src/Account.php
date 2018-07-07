@@ -4,25 +4,41 @@ namespace Arionum\Arionum;
 
 class Account
 {
-    // inserts the account in the DB and updates the public key if empty
-    public function add($public_key, $block)
+    /**
+     * Insert the account into the database and update the public key if empty.
+     * @param string $publicKey
+     * @param string $block
+     * @return void
+     */
+    public function add(string $publicKey, string $block): void
     {
         global $db;
-        $id = $this->getAddress($public_key);
-        $bind = [":id" => $id, ":public_key" => $public_key, ":block" => $block, ":public_key2" => $public_key];
-
+        $id = $this->getAddress($publicKey);
+        $bind = [":id" => $id, ":public_key" => $publicKey, ":block" => $block, ":public_key2" => $publicKey];
         $db->run(
-            "INSERT INTO accounts SET id=:id, public_key=:public_key, block=:block, balance=0 ON DUPLICATE KEY UPDATE public_key=if(public_key='',:public_key2,public_key)",
+            "INSERT INTO accounts
+             SET id=:id, public_key=:public_key, block=:block, balance=0
+             ON DUPLICATE KEY
+             UPDATE public_key=if(public_key='',:public_key2,public_key)",
             $bind
         );
     }
 
-    // inserts just the account without public key
-    public function addId($id, $block)
+    /**
+     * Insert just the account without the public key.
+     * @param string $id
+     * @param string $block
+     * @return void
+     */
+    public function addId(string $id, string $block): void
     {
         global $db;
         $bind = [":id" => $id, ":block" => $block];
-        $db->run("INSERT ignore INTO accounts SET id=:id, public_key='', block=:block, balance=0", $bind);
+        $db->run(
+            "INSERT ignore INTO accounts
+             SET id=:id, public_key='', block=:block, balance=0",
+            $bind
+        );
     }
 
     /**
@@ -44,43 +60,57 @@ class Account
         return base58Encode($publicKey);
     }
 
-    // checks the ECDSA secp256k1 signature for a specific public key
-    public function checkSignature($data, $signature, $public_key)
+    /**
+     * Check the ECDSA secp256k1 signature for a specific public key.
+     * @param string $data
+     * @param string $signature
+     * @param string $publicKey
+     * @return bool
+     */
+    public function checkSignature(string $data, string $signature, string $publicKey): bool
     {
-        return ecVerify($data, $signature, $public_key);
+        return ecVerify($data, $signature, $publicKey);
     }
 
-    // generates a new account and a public/private key pair
-    public function generateAccount()
+    /**
+     * Generate a new account and a public/private key pair.
+     * @return array
+     */
+    public function generateAccount(): array
     {
-        // using secp256k1 curve for ECDSA
+        // Using secp256k1 curve for ECDSA
         $args = [
             "curve_name"       => "secp256k1",
             "private_key_type" => OPENSSL_KEYTYPE_EC,
         ];
 
-        // generates a new key pair
+        // Generate a new key pair
         $key1 = openssl_pkey_new($args);
 
-        // exports the private key encoded as PEM
+        // Export the private key encoded as PEM
         openssl_pkey_export($key1, $pvkey);
 
-        // converts the PEM to a base58 format
+        // Convert the PEM to a Base58 format
         $private_key = pemToCoin($pvkey);
 
-        // exports the private key encoded as PEM
+        // Export the private key encoded as PEM
         $pub = openssl_pkey_get_details($key1);
 
-        // converts the PEM to a base58 format
+        // Convert the PEM to a Base58 format
         $public_key = pemToCoin($pub['key']);
 
-        // generates the account's address based on the public key
+        // Generate the account's address based on the public key
         $address = $this->getAddress($public_key);
         return ["address" => $address, "public_key" => $public_key, "private_key" => $private_key];
     }
 
-    // check the validity of a base58 encoded key. At the moment, it checks only the characters to be base58.
-    public function validKey($id)
+    /**
+     * Check the validity of a Base58 encoded key.
+     * At the moment, it only checks that the characters are Base58.
+     * @param string $id
+     * @return bool
+     */
+    public function validKey(string $id): bool
     {
         $chars = str_split("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
         for ($i = 0; $i < strlen($id);
@@ -93,8 +123,13 @@ class Account
         return true;
     }
 
-    // check the validity of an address. At the moment, it checks only the characters to be base58 and the length to be >=70 and <=128.
-    public function valid($id)
+    /**
+     * Check the validity of an address.
+     * At the moment, it checks only that the characters are Base58 and the length is >=70 and <=128.
+     * @param string $id
+     * @return bool
+     */
+    public function valid(string $id): bool
     {
         if (strlen($id) < 70 || strlen($id) > 128) {
             return false;
@@ -110,8 +145,12 @@ class Account
         return true;
     }
 
-    // returns the current account balance
-    public function balance($id)
+    /**
+     * Get the balance of a specified address.
+     * @param string $id
+     * @return string
+     */
+    public function balance(string $id): string
     {
         global $db;
         $res = $db->single("SELECT balance FROM accounts WHERE id=:id", [":id" => $id]);
@@ -122,8 +161,12 @@ class Account
         return number_format($res, 8, ".", "");
     }
 
-    // returns the account balance - any pending debits from the mempool
-    public function pendingBalance($id)
+    /**
+     * Get the balance of a specified address, including any pending debits from the Mempool.
+     * @param string $id
+     * @return string
+     */
+    public function pendingBalance(string $id): string
     {
         global $db;
         $res = $db->single("SELECT balance FROM accounts WHERE id=:id", [":id" => $id]);
@@ -131,7 +174,7 @@ class Account
             $res = "0.00000000";
         }
 
-        // if the original balance is 0, no mempool transactions are possible
+        // If the original balance is 0, no mempool transactions are possible
         if ($res == "0.00000000") {
             return $res;
         }
@@ -140,8 +183,13 @@ class Account
         return number_format($rez, 8, ".", "");
     }
 
-    // returns all the transactions of a specific address
-    public function getTransactions($id, $limit = 100)
+    /**
+     * Get transactions for a specific address.
+     * @param string $id
+     * @param int    $limit
+     * @return array
+     */
+    public function getTransactions(string $id, int $limit = 100): array
     {
         global $db;
         $block = new Block();
@@ -193,8 +241,12 @@ class Account
         return $transactions;
     }
 
-    // returns the transactions from the mempool
-    public function getMempoolTransactions($id)
+    /**
+     * Get Mempool transactions from a specific address.
+     * @param string $id
+     * @return array
+     */
+    public function getMempoolTransactions(string $id): array
     {
         global $db;
         $transactions = [];
@@ -218,16 +270,22 @@ class Account
                 "public_key" => $x['public_key'],
             ];
             $trans['type'] = "mempool";
-            // they are unconfirmed, so they will have -1 confirmations.
+
+            // They are unconfirmed, so they will have -1 confirmations.
             $trans['confirmations'] = -1;
+
             ksort($trans);
             $transactions[] = $trans;
         }
         return $transactions;
     }
 
-    // returns the public key for a specific account
-    public function publicKey($id)
+    /**
+     * Return the public key for a specific account.
+     * @param string $id
+     * @return string
+     */
+    public function publicKey(string $id): string
     {
         global $db;
         $res = $db->single("SELECT public_key FROM accounts WHERE id=:id", [":id" => $id]);
