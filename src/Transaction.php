@@ -12,7 +12,7 @@ class Transaction
         $r = $db->run("SELECT * FROM transactions WHERE block=:block", [":block" => $block]);
         foreach ($r as $x) {
             if (empty($x['src'])) {
-                $x['src'] = $acc->get_address($x['public_key']);
+                $x['src'] = $acc->getAddress($x['public_key']);
             }
             $db->run(
                 "UPDATE accounts SET balance=balance-:val WHERE id=:id",
@@ -285,7 +285,7 @@ class Transaction
         }
 
         //verify the ecdsa signature
-        if (!$acc->check_signature($info, $x['signature'], $x['public_key'])) {
+        if (!$acc->checkSignature($info, $x['signature'], $x['public_key'])) {
             _log("$x[id] - Invalid signature");
             return false;
         }
@@ -336,7 +336,7 @@ class Transaction
             "date"       => $x['date'],
             "public_key" => $x['public_key'],
         ];
-        $trans['src'] = $acc->get_address($x['public_key']);
+        $trans['src'] = $acc->getAddress($x['public_key']);
         $trans['confirmations'] = $current['height'] - $x['height'];
 
         if ($x['version'] == 0) {
@@ -386,7 +386,7 @@ class Transaction
                 "date"       => $x['date'],
                 "public_key" => $x['public_key'],
             ];
-            $trans['src'] = $acc->get_address($x['public_key']);
+            $trans['src'] = $acc->getAddress($x['public_key']);
             $trans['confirmations'] = $current['height'] - $x['height'];
 
             if ($x['version'] == 0) {

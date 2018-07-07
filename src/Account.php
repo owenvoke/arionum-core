@@ -8,7 +8,7 @@ class Account
     public function add($public_key, $block)
     {
         global $db;
-        $id = $this->get_address($public_key);
+        $id = $this->getAddress($public_key);
         $bind = [":id" => $id, ":public_key" => $public_key, ":block" => $block, ":public_key2" => $public_key];
 
         $db->run(
@@ -26,7 +26,7 @@ class Account
     }
 
     // generates Account's address from the public key
-    public function get_address($hash)
+    public function getAddress($hash)
     {
         //broken base58 addresses, which are block winners, missing the first 0 bytes from the address.
         if ($hash == 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCwCpspGFGQSaF9yVGLamBgymdf8M7FafghmP3oPzQb3W4PZsZApVa41uQrrHRVBH5p9bdoz7c6XeRQHK2TkzWR45e') {
@@ -48,13 +48,13 @@ class Account
     }
 
     // checks the ecdsa secp256k1 signature for a specific public key
-    public function check_signature($data, $signature, $public_key)
+    public function checkSignature($data, $signature, $public_key)
     {
         return ec_verify($data, $signature, $public_key);
     }
 
     // generates a new account and a public/private key pair
-    public function generate_account()
+    public function generateAccount()
     {
         // using secp256k1 curve for ECDSA
         $args = [
@@ -78,12 +78,12 @@ class Account
         $public_key = pem2coin($pub['key']);
 
         // generates the account's address based on the public key
-        $address = $this->get_address($public_key);
+        $address = $this->getAddress($public_key);
         return ["address" => $address, "public_key" => $public_key, "private_key" => $private_key];
     }
 
     // check the validity of a base58 encoded key. At the moment, it checks only the characters to be base58.
-    public function valid_key($id)
+    public function validKey($id)
     {
         $chars = str_split("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
         for ($i = 0; $i < strlen($id);
@@ -126,7 +126,7 @@ class Account
     }
 
     // returns the account balance - any pending debits from the mempool
-    public function pending_balance($id)
+    public function pendingBalance($id)
     {
         global $db;
         $res = $db->single("SELECT balance FROM accounts WHERE id=:id", [":id" => $id]);
@@ -144,12 +144,12 @@ class Account
     }
 
     // returns all the transactions of a specific address
-    public function get_transactions($id, $limit = 100)
+    public function getTransactions($id, $limit = 100)
     {
         global $db;
         $block = new Block();
         $current = $block->current();
-        $public_key = $this->public_key($id);
+        $public_key = $this->publicKey($id);
         $limit = intval($limit);
         if ($limit > 100 || $limit < 1) {
             $limit = 100;
@@ -174,7 +174,7 @@ class Account
                 "date"       => $x['date'],
                 "public_key" => $x['public_key'],
             ];
-            $trans['src'] = $this->get_address($x['public_key']);
+            $trans['src'] = $this->getAddress($x['public_key']);
             $trans['confirmations'] = $current['height'] - $x['height'];
 
             // version 0 -> reward transaction, version 1 -> normal transaction
@@ -197,7 +197,7 @@ class Account
     }
 
     // returns the transactions from the mempool
-    public function get_mempool_transactions($id)
+    public function getMempoolTransactions($id)
     {
         global $db;
         $transactions = [];
@@ -230,7 +230,7 @@ class Account
     }
 
     // returns the public key for a specific account
-    public function public_key($id)
+    public function publicKey($id)
     {
         global $db;
         $res = $db->single("SELECT public_key FROM accounts WHERE id=:id", [":id" => $id]);

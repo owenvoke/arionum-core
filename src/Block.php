@@ -10,7 +10,7 @@ class Block
         $acc = new Account();
         $trx = new Transaction();
 
-        $generator = $acc->get_address($public_key);
+        $generator = $acc->getAddress($public_key);
 
         // the transactions are always sorted in the same way, on all nodes, as they are hashed as json
         ksort($data);
@@ -26,7 +26,7 @@ class Block
 
         // create the block data and check it against the signature
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
-        if (!$acc->check_signature($info, $signature, $public_key)) {
+        if (!$acc->checkSignature($info, $signature, $public_key)) {
             _log("Block signature check failed");
             return false;
         }
@@ -59,7 +59,7 @@ class Block
         $transaction['id'] = $trx->hash($transaction);
         // check the signature
         $info = $transaction['val']."-".$transaction['fee']."-".$transaction['dst']."-".$transaction['message']."-".$transaction['version']."-".$transaction['public_key']."-".$transaction['date'];
-        if (!$acc->check_signature($info, $reward_signature, $public_key)) {
+        if (!$acc->checkSignature($info, $reward_signature, $public_key)) {
             _log("Reward signature failed");
             return false;
         }
@@ -237,7 +237,7 @@ class Block
         $acc = new Account();
         // generator's public key must be valid
 
-        if (!$acc->valid_key($data['public_key'])) {
+        if (!$acc->validKey($data['public_key'])) {
             _log("Invalid public key - $data[public_key]");
             return false;
         }
@@ -282,7 +282,7 @@ class Block
 
         $difficulty = $this->difficulty();
         $acc = new Account();
-        $generator = $acc->get_address($public_key);
+        $generator = $acc->getAddress($public_key);
 
         // always sort  the transactions in the same way
         ksort($data);
@@ -416,7 +416,7 @@ class Block
         foreach ($data as &$x) {
             // get the sender's account if empty
             if (empty($x['src'])) {
-                $x['src'] = $acc->get_address($x['public_key']);
+                $x['src'] = $acc->getAddress($x['public_key']);
             }
 
             //validate the transaction
