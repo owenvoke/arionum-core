@@ -8,20 +8,20 @@ function san($a, $b = "")
     return $a;
 }
 
-function san_ip($a)
+function sanIp($a)
 {
     $a = preg_replace("/[^a-fA-F0-9\[\]\.\:]/", "", $a);
     return $a;
 }
 
-function san_host($a)
+function sanHost($a)
 {
     $a = preg_replace("/[^a-zA-Z0-9\.\-\:\/]/", "", $a);
     return $a;
 }
 
 // api  error and exit
-function api_err($data)
+function apiErr($data)
 {
     global $_config;
     echo json_encode(["status" => "error", "data" => $data, "coin" => $_config['coin']]);
@@ -29,7 +29,7 @@ function api_err($data)
 }
 
 // api print ok and exit
-function api_echo($data)
+function apiEcho($data)
 {
     global $_config;
     echo json_encode(["status" => "ok", "data" => $data, "coin" => $_config['coin']]);
@@ -63,7 +63,7 @@ function _log($data)
 }
 
 // converts PEM key to hex
-function pem2hex($data)
+function pemToHex($data)
 {
     $data = str_replace("-----BEGIN PUBLIC KEY-----", "", $data);
     $data = str_replace("-----END PUBLIC KEY-----", "", $data);
@@ -76,7 +76,7 @@ function pem2hex($data)
 }
 
 // converts hex key to PEM
-function hex2pem($data, $is_private_key = false)
+function hexToPem($data, $is_private_key = false)
 {
     $data = hex2bin($data);
     $data = base64_encode($data);
@@ -88,7 +88,7 @@ function hex2pem($data, $is_private_key = false)
 
 
 // Base58 encoding/decoding functions - all credits go to https://github.com/stephen-hill/base58php
-function base58_encode($string)
+function base58Encode($string)
 {
     $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     $base = strlen($alphabet);
@@ -130,7 +130,7 @@ function base58_encode($string)
     return (string)$output;
 }
 
-function base58_decode($base58)
+function base58Decode($base58)
 {
     $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     $base = strlen($alphabet);
@@ -175,7 +175,7 @@ function base58_decode($base58)
 }
 
 // converts PEM key to the base58 version used by ARO
-function pem2coin($data)
+function pemToCoin($data)
 {
     $data = str_replace("-----BEGIN PUBLIC KEY-----", "", $data);
     $data = str_replace("-----END PUBLIC KEY-----", "", $data);
@@ -185,13 +185,13 @@ function pem2coin($data)
     $data = base64_decode($data);
 
 
-    return base58_encode($data);
+    return base58Encode($data);
 }
 
 // converts the key in base58 to PEM
-function coin2pem($data, $is_private_key = false)
+function coinToPem($data, $is_private_key = false)
 {
-    $data = base58_decode($data);
+    $data = base58Decode($data);
     $data = base64_encode($data);
 
     $dat = str_split($data, 64);
@@ -204,10 +204,10 @@ function coin2pem($data, $is_private_key = false)
 }
 
 // sign data with private key
-function ec_sign($data, $key)
+function ecSign($data, $key)
 {
     // transform the base58 key format to PEM
-    $private_key = coin2pem($key, true);
+    $private_key = coinToPem($key, true);
 
 
     $pkey = openssl_pkey_get_private($private_key);
@@ -218,21 +218,20 @@ function ec_sign($data, $key)
     openssl_sign($data, $signature, $pkey, OPENSSL_ALGO_SHA256);
 
     // the signature will be base58 encoded
-    return base58_encode($signature);
+    return base58Encode($signature);
 }
 
 
-function ec_verify($data, $signature, $key)
+function ecVerify($data, $signature, $key)
 {
     // transform the base58 key to PEM
-    $public_key = coin2pem($key);
+    $public_key = coinToPem($key);
 
-    $signature = base58_decode($signature);
+    $signature = base58Decode($signature);
 
     $pkey = openssl_pkey_get_public($public_key);
 
     $res = openssl_verify($data, $signature, $pkey, OPENSSL_ALGO_SHA256);
-
 
     if ($res === 1) {
         return true;
@@ -241,7 +240,7 @@ function ec_verify($data, $signature, $key)
 }
 
 // POST data to an URL (usualy peer). The data is an array, json encoded with is sent as $_POST['data']
-function peer_post($url, $data = [], $timeout = 60, $debug = false)
+function peerPost($url, $data = [], $timeout = 60, $debug = false)
 {
     global $_config;
     if ($debug) {
@@ -280,15 +279,15 @@ function peer_post($url, $data = [], $timeout = 60, $debug = false)
 }
 
 // convers hex to base58
-function hex2coin($hex)
+function hexToCoin($hex)
 {
     $data = hex2bin($hex);
-    return base58_encode($data);
+    return base58Encode($data);
 }
 
 // converts base58 to hex
-function coin2hex($data)
+function coinToHex($data)
 {
-    $bin = base58_decode($data);
+    $bin = base58Decode($data);
     return bin2hex($bin);
 }

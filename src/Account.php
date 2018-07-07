@@ -44,13 +44,13 @@ class Account
              $i++) {
             $hash = hash('sha512', $hash, true);
         }
-        return base58_encode($hash);
+        return base58Encode($hash);
     }
 
     // checks the ecdsa secp256k1 signature for a specific public key
     public function checkSignature($data, $signature, $public_key)
     {
-        return ec_verify($data, $signature, $public_key);
+        return ecVerify($data, $signature, $public_key);
     }
 
     // generates a new account and a public/private key pair
@@ -69,13 +69,13 @@ class Account
         openssl_pkey_export($key1, $pvkey);
 
         // converts the PEM to a base58 format
-        $private_key = pem2coin($pvkey);
+        $private_key = pemToCoin($pvkey);
 
         // exports the private key encoded as PEM
         $pub = openssl_pkey_get_details($key1);
 
         // converts the PEM to a base58 format
-        $public_key = pem2coin($pub['key']);
+        $public_key = pemToCoin($pub['key']);
 
         // generates the account's address based on the public key
         $address = $this->getAddress($public_key);

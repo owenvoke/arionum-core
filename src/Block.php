@@ -487,7 +487,7 @@ class Block
             $argon
         );
         if (!$res) {
-            api_err("Could not add the genesis block.");
+            apiErr("Could not add the genesis block.");
         }
     }
 
@@ -579,7 +579,7 @@ class Block
         $json = json_encode($data);
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
 
-        $signature = ec_sign($info, $key);
+        $signature = ecSign($info, $key);
         return $signature;
     }
 
@@ -588,7 +588,7 @@ class Block
     {
         $json = json_encode($data);
         $hash = hash("sha512", "{$public_key}-{$height}-{$date}-{$nonce}-{$json}-{$signature}-{$difficulty}-{$argon}");
-        return hex2coin($hash);
+        return hexToCoin($hash);
     }
 
 

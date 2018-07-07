@@ -195,7 +195,7 @@ class Transaction
     {
         $info = $x['val']."-".$x['fee']."-".$x['dst']."-".$x['message']."-".$x['version']."-".$x['public_key']."-".$x['date']."-".$x['signature'];
         $hash = hash("sha512", $info);
-        return hex2coin($hash);
+        return hexToCoin($hash);
     }
 
     // check the transaction for validity
@@ -274,11 +274,10 @@ class Transaction
         // the hash does not match our regenerated hash
         if ($x['id'] != $id) {
             // fix for broken base58 library which was used until block 16900, accepts hashes without the first 1 or 2 bytes
-            $xs = base58_decode($x['id']);
-            if (((strlen($xs) != 63 || substr($id, 1) != $x['id']) && (strlen($xs) != 62 || substr(
-                            $id,
-                            2
-                        ) != $x['id'])) || $height > 16900) {
+            $xs = base58Decode($x['id']);
+            if (((strlen($xs) != 63 || substr($id, 1) != $x['id']) && (strlen($xs) != 62 || substr($id, 2) != $x['id']))
+                || $height > 16900
+            ) {
                 _log("$x[id] - $id - Invalid hash");
                 return false;
             }
@@ -297,7 +296,7 @@ class Transaction
     public function sign($x, $private_key)
     {
         $info = $x['val']."-".$x['fee']."-".$x['dst']."-".$x['message']."-".$x['version']."-".$x['public_key']."-".$x['date'];
-        $signature = ec_sign($info, $private_key);
+        $signature = ecSign($info, $private_key);
 
         return $signature;
     }
