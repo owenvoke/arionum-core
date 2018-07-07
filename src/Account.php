@@ -1,5 +1,7 @@
 <?php
 
+namespace Arionum\Arionum;
+
 class Account
 {
     // inserts the account in the DB and updates the public key if empty

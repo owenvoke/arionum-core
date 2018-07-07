@@ -1,5 +1,7 @@
 <?php
 
+namespace Arionum\Arionum;
+
 class Block
 {
     public function add($height, $public_key, $nonce, $data, $date, $signature, $difficulty, $reward_signature, $argon)

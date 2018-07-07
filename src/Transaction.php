@@ -1,5 +1,7 @@
 <?php
 
+namespace Arionum\Arionum;
+
 class Transaction
 {
     // reverse and remove all transactions from a block
