@@ -1,43 +1,67 @@
 <?php
 
-// simple santization function to accept only alphanumeric characters
-function san($a, $b = "")
+/**
+ * Sanitise data to only allow alphanumeric characters.
+ * @param string $input
+ * @param string $additionalCharacters
+ * @return string
+ */
+function san(string $input, string $additionalCharacters = ''): string
 {
-    $a = preg_replace("/[^a-zA-Z0-9".$b."]/", "", $a);
-
-    return $a;
+    return preg_replace('/[^a-zA-Z0-9'.$additionalCharacters.']/', '', $input);
 }
 
-function sanIp($a)
+/**
+ * @param string $ipAddress
+ * @return string
+ */
+function sanIp($ipAddress): string
 {
-    $a = preg_replace("/[^a-fA-F0-9\[\]\.\:]/", "", $a);
-    return $a;
+    return preg_replace('/[^a-fA-F0-9\\[\\]\\.\\:]/', '', $ipAddress);
 }
 
-function sanHost($a)
+/**
+ * @param $hostAddress
+ * @return string
+ */
+function sanHost(string $hostAddress): string
 {
-    $a = preg_replace("/[^a-zA-Z0-9\.\-\:\/]/", "", $a);
-    return $a;
+    return preg_replace('/[^a-zA-Z0-9\\.\\-\\:\\/]/', '', $hostAddress);
 }
 
-// api  error and exit
-function apiErr($data)
+/**
+ * Output an API error and exit.
+ * @param mixed $data
+ * @return void
+ */
+function apiErr($data): void
 {
     global $_config;
     echo json_encode(["status" => "error", "data" => $data, "coin" => $_config['coin']]);
     exit;
 }
 
-// api print ok and exit
-function apiEcho($data)
+/**
+ * Output an API 'ok' response and exit.
+ * @param mixed $data
+ * @return void
+ */
+function apiEcho($data): void
 {
     global $_config;
     echo json_encode(["status" => "ok", "data" => $data, "coin" => $_config['coin']]);
     exit;
 }
 
-// log function, shows only in cli atm
-function _log($data)
+/**
+ * Log function, this only shows in the CLI.
+ * @param string $data
+ * @return void
+ *
+ * @todo Convert to Monolog
+ * @link https://github.com/pxgamer/arionum/issues/3
+ */
+function _log(string $data): void
 {
     $date = date("[Y-m-d H:i:s]");
     $trace = debug_backtrace();
@@ -62,8 +86,12 @@ function _log($data)
     }
 }
 
-// converts PEM key to hex
-function pemToHex($data)
+/**
+ * Convert a PEM key to hexadecimal.
+ * @param string $data
+ * @return string
+ */
+function pemToHex(string $data): string
 {
     $data = str_replace("-----BEGIN PUBLIC KEY-----", "", $data);
     $data = str_replace("-----END PUBLIC KEY-----", "", $data);
@@ -75,20 +103,32 @@ function pemToHex($data)
     return $data;
 }
 
-// converts hex key to PEM
-function hexToPem($data, $is_private_key = false)
+/**
+ * Convert a hexadecimal key to PEM.
+ * @param string $data
+ * @param bool   $isPrivateKey
+ * @return string
+ */
+function hexToPem(string $data, bool $isPrivateKey = false): string
 {
     $data = hex2bin($data);
     $data = base64_encode($data);
-    if ($is_private_key) {
+    if ($isPrivateKey) {
         return "-----BEGIN EC PRIVATE KEY-----\n".$data."\n-----END EC PRIVATE KEY-----";
     }
+
     return "-----BEGIN PUBLIC KEY-----\n".$data."\n-----END PUBLIC KEY-----";
 }
 
 
-// Base58 encoding/decoding functions - all credits go to https://github.com/stephen-hill/base58php
-function base58Encode($string)
+/**
+ * Encode a string to Base58.
+ * @param string $string
+ * @return bool|string
+ * @author Stephen Hill
+ * @link https://github.com/stephen-hill/base58php
+ */
+function base58Encode(string $string)
 {
     $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     $base = strlen($alphabet);
@@ -130,7 +170,14 @@ function base58Encode($string)
     return (string)$output;
 }
 
-function base58Decode($base58)
+/**
+ * Decode a Base58 string.
+ * @param string $base58
+ * @return bool|string
+ * @author Stephen Hill
+ * @link https://github.com/stephen-hill/base58php
+ */
+function base58Decode(string $base58)
 {
     $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     $base = strlen($alphabet);
@@ -171,11 +218,16 @@ function base58Decode($base58)
         }
         break;
     }
+
     return $output;
 }
 
-// converts PEM key to the base58 version used by ARO
-function pemToCoin($data)
+/**
+ * Convert a PEM key to the Base58 version used by Arionum.
+ * @param string $data
+ * @return string
+ */
+function pemToCoin(string $data): string
 {
     $data = str_replace("-----BEGIN PUBLIC KEY-----", "", $data);
     $data = str_replace("-----END PUBLIC KEY-----", "", $data);
@@ -184,12 +236,16 @@ function pemToCoin($data)
     $data = str_replace("\n", "", $data);
     $data = base64_decode($data);
 
-
     return base58Encode($data);
 }
 
-// converts the key in base58 to PEM
-function coinToPem($data, $is_private_key = false)
+/**
+ * Convert an Arionum Base58 key to PEM format.
+ * @param string $data
+ * @param bool   $isPrivateKey
+ * @return string
+ */
+function coinToPem(string $data, $isPrivateKey = false)
 {
     $data = base58Decode($data);
     $data = base64_encode($data);
@@ -197,32 +253,41 @@ function coinToPem($data, $is_private_key = false)
     $dat = str_split($data, 64);
     $data = implode("\n", $dat);
 
-    if ($is_private_key) {
+    if ($isPrivateKey) {
         return "-----BEGIN EC PRIVATE KEY-----\n".$data."\n-----END EC PRIVATE KEY-----\n";
     }
     return "-----BEGIN PUBLIC KEY-----\n".$data."\n-----END PUBLIC KEY-----\n";
 }
 
-// sign data with private key
-function ecSign($data, $key)
+/**
+ * Sign data with the private key.
+ * @param string $data
+ * @param string $key
+ * @return bool|string
+ */
+function ecSign($data, string $key)
 {
-    // transform the base58 key format to PEM
+    // Transform the base58 key format to PEM
     $private_key = coinToPem($key, true);
-
 
     $pkey = openssl_pkey_get_private($private_key);
 
     $k = openssl_pkey_get_details($pkey);
 
-
     openssl_sign($data, $signature, $pkey, OPENSSL_ALGO_SHA256);
 
-    // the signature will be base58 encoded
+    // The signature will be base58 encoded
     return base58Encode($signature);
 }
 
-
-function ecVerify($data, $signature, $key)
+/**
+ * Verify a signature with a public key.
+ * @param string $data
+ * @param string $signature
+ * @param string $key
+ * @return bool
+ */
+function ecVerify(string $data, string $signature, string $key)
 {
     // transform the base58 key to PEM
     $public_key = coinToPem($key);
@@ -236,11 +301,20 @@ function ecVerify($data, $signature, $key)
     if ($res === 1) {
         return true;
     }
+
     return false;
 }
 
-// POST data to an URL (usualy peer). The data is an array, json encoded with is sent as $_POST['data']
-function peerPost($url, $data = [], $timeout = 60, $debug = false)
+/**
+ * Post data to a URL endpoint (usually a peer).
+ * The data is an array that is JSON encoded and sent as a data parameter.
+ * @param string $url
+ * @param array  $data
+ * @param int    $timeout
+ * @param bool   $debug
+ * @return bool
+ */
+function peerPost(string $url, array $data = [], int $timeout = 60, bool $debug = false): bool
 {
     global $_config;
     if ($debug) {
@@ -278,15 +352,23 @@ function peerPost($url, $data = [], $timeout = 60, $debug = false)
     return $res['data'];
 }
 
-// convers hex to base58
-function hexToCoin($hex)
+/**
+ * Convert hexadecimal data to Base58.
+ * @param string $hex
+ * @return string
+ */
+function hexToCoin(string $hex): string
 {
     $data = hex2bin($hex);
     return base58Encode($data);
 }
 
-// converts base58 to hex
-function coinToHex($data)
+/**
+ * Convert Base58 data to hexadecimal.
+ * @param string $data
+ * @return string
+ */
+function coinToHex(string $data): string
 {
     $bin = base58Decode($data);
     return bin2hex($bin);
