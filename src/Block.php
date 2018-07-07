@@ -31,7 +31,7 @@ class Block
             return false;
         }
 
-        if (!$this->parse_block($hash, $height, $data, true)) {
+        if (!$this->parseBlock($hash, $height, $data, true)) {
             _log("Parse block failed");
             return false;
         }
@@ -94,7 +94,7 @@ class Block
         $trx->add($hash, $height, $transaction);
 
         // parse the block's transactions and insert them to db
-        $res = $this->parse_block($hash, $height, $data, false);
+        $res = $this->parseBlock($hash, $height, $data, false);
         // if any fails, rollback
         if ($res == false) {
             $db->rollback();
@@ -190,7 +190,7 @@ class Block
     }
 
     // calculates the maximum block size and increase by 10% the number of transactions if > 100 on the last 100 blocks
-    public function max_transactions()
+    public function maxTransactions()
     {
         global $db;
         $current = $this->current();
@@ -277,7 +277,7 @@ class Block
 
         // get the mempool transactions
         $txn = new Transaction();
-        $data = $txn->mempool($this->max_transactions());
+        $data = $txn->mempool($this->maxTransactions());
 
 
         $difficulty = $this->difficulty();
@@ -392,7 +392,7 @@ class Block
 
 
     // parse the block transactions
-    public function parse_block($block, $height, $data, $test = true)
+    public function parseBlock($block, $height, $data, $test = true)
     {
         global $db;
         // data must be array
@@ -407,7 +407,7 @@ class Block
         }
 
         // check if the number of transactions is not bigger than current block size
-        $max = $this->max_transactions();
+        $max = $this->maxTransactions();
         if (count($data) > $max) {
             return false;
         }
@@ -536,9 +536,8 @@ class Block
 
 
     // delete specific block
-    public function delete_id($id)
+    public function deleteId($id)
     {
-
         global $db;
         $trx = new Transaction();
 
