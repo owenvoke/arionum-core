@@ -18,7 +18,7 @@ class Account
     }
 
     // inserts just the account without public key
-    public function add_id($id, $block)
+    public function addId($id, $block)
     {
         global $db;
         $bind = [":id" => $id, ":block" => $block];

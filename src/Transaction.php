@@ -39,7 +39,7 @@ class Transaction
     }
 
     // clears the mempool
-    public function clean_mempool()
+    public function cleanMempool()
     {
         global $db;
         $block = new Block();
@@ -156,7 +156,7 @@ class Transaction
         global $db;
         $acc = new Account();
         $acc->add($x['public_key'], $block);
-        $acc->add_id($x['dst'], $block);
+        $acc->addId($x['dst'], $block);
         $x['id'] = san($x['id']);
         $bind = [
             ":id"         => $x['id'],
