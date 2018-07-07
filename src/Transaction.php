@@ -29,7 +29,7 @@ class Transaction
 
             // add the transactions to mempool
             if ($x['version'] > 0) {
-                $this->add_mempool($x);
+                $this->addMempool($x);
             }
             $res = $db->run("DELETE FROM transactions WHERE id=:id", [":id" => $x['id']]);
             if ($res != 1) {
@@ -122,7 +122,7 @@ class Transaction
     }
 
     // add a new transaction to mempool and lock it with the current height
-    public function add_mempool($x, $peer = "")
+    public function addMempool($x, $peer = "")
     {
         global $db;
         $block = new Block();
@@ -276,9 +276,9 @@ class Transaction
             // fix for broken base58 library which was used until block 16900, accepts hashes without the first 1 or 2 bytes
             $xs = base58_decode($x['id']);
             if (((strlen($xs) != 63 || substr($id, 1) != $x['id']) && (strlen($xs) != 62 || substr(
-                $id,
-                2
-            ) != $x['id'])) || $height > 16900) {
+                            $id,
+                            2
+                        ) != $x['id'])) || $height > 16900) {
                 _log("$x[id] - $id - Invalid hash");
                 return false;
             }
@@ -311,7 +311,7 @@ class Transaction
     }
 
     // get the transaction data as array
-    public function get_transaction($id)
+    public function getTransaction($id)
     {
         global $db;
         $acc = new Account();
@@ -355,7 +355,7 @@ class Transaction
     }
 
     // return the transactions for a specific block id or height
-    public function get_transactions($height = "", $id = "")
+    public function getTransactions($height = "", $id = "")
     {
         global $db;
         $block = new Block();
@@ -407,7 +407,7 @@ class Transaction
     }
 
     // get a specific mempool transaction as array
-    public function get_mempool_transaction($id)
+    public function getMempoolTransaction($id)
     {
         global $db;
         $x = $db->row("SELECT * FROM mempool WHERE id=:id", [":id" => $id]);
