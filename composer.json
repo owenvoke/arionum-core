@@ -4,7 +4,7 @@
     "description": "A collection of core classes for the Arionum network.",
     "license": "MIT",
     "require": {
-        "php": "^7.1",
+        "php": "^7.2",
         "ext-bcmath": "*",
         "ext-gmp": "*",
         "ext-json": "*",
