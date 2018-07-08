@@ -15,31 +15,34 @@ class Transaction
     public function reverse(string $block): bool
     {
         global $db;
-        $acc = new Account();
-        $r = $db->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
-        foreach ($r as $x) {
-            if (empty($x['src'])) {
-                $x['src'] = $acc->getAddress($x['public_key']);
+        $account = new Account();
+        $transactions = $db->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
+
+        foreach ($transactions as $transaction) {
+            if (empty($transaction['src'])) {
+                $transaction['src'] = $account->getAddress($transaction['public_key']);
             }
+
             $db->run(
                 'UPDATE accounts SET balance = balance - :val WHERE id = :id',
-                [':id' => $x['dst'], ':val' => $x['val']]
+                [':id' => $transaction['dst'], ':val' => $transaction['val']]
             );
 
             // On version 0 / reward transaction, don't credit anyone
-            if ($x['version'] > 0) {
+            if ($transaction['version'] > 0) {
                 $db->run(
                     'UPDATE accounts SET balance = balance + :val WHERE id = :id',
-                    [':id' => $x['src'], ':val' => $x['val'] + $x['fee']]
+                    [':id' => $transaction['src'], ':val' => $transaction['val'] + $transaction['fee']]
                 );
             }
 
             // Add the transactions to mempool
-            if ($x['version'] > 0) {
-                $this->addMempool($x);
+            if ($transaction['version'] > 0) {
+                $this->addMempool($transaction);
             }
-            $res = $db->run('DELETE FROM transactions WHERE id = :id', [':id' => $x['id']]);
-            if ($res != 1) {
+
+            $result = $db->run('DELETE FROM transactions WHERE id = :id', [':id' => $transaction['id']]);
+            if ($result != 1) {
                 return false;
             }
         }
@@ -56,8 +59,10 @@ class Transaction
         global $db;
         $block = new Block();
         $current = $block->current();
+
         $height = $current['height'];
         $limit = $height - 1000;
+
         $db->run('DELETE FROM mempool WHERE height < :limit', [':limit' => $limit]);
     }
 
@@ -70,68 +75,72 @@ class Transaction
     {
         global $db;
         $block = new Block();
+
         $current = $block->current();
         $height = $current['height'] + 1;
 
         // Only get the transactions that are not locked with a future height
-        $r = $db->run(
+        $transactions = $db->run(
             'SELECT * FROM mempool WHERE height <= :height ORDER by val/fee DESC LIMIT :max',
             [':height' => $height, ':max' => $max + 50]
         );
         $transactions = [];
-        if (count($r) > 0) {
+        if (count($transactions) > 0) {
             $i = 0;
             $balance = [];
-            foreach ($r as $x) {
+            foreach ($transactions as $transaction) {
                 $trans = [
-                    'id'         => $x['id'],
-                    'dst'        => $x['dst'],
-                    'val'        => $x['val'],
-                    'fee'        => $x['fee'],
-                    'signature'  => $x['signature'],
-                    'message'    => $x['message'],
-                    'version'    => $x['version'],
-                    'date'       => $x['date'],
-                    'public_key' => $x['public_key'],
+                    'id'         => $transaction['id'],
+                    'dst'        => $transaction['dst'],
+                    'val'        => $transaction['val'],
+                    'fee'        => $transaction['fee'],
+                    'signature'  => $transaction['signature'],
+                    'message'    => $transaction['message'],
+                    'version'    => $transaction['version'],
+                    'date'       => $transaction['date'],
+                    'public_key' => $transaction['public_key'],
                 ];
 
                 if ($i >= $max) {
                     break;
                 }
 
-                if (empty($x['public_key'])) {
-                    _log('$x[id] - Transaction has empty public_key');
+                if (empty($transaction['public_key'])) {
+                    _log($transaction['id'].' - Transaction has empty public_key');
                     continue;
                 }
-                if (empty($x['src'])) {
-                    _log("$x[id] - Transaction has empty src");
+
+                if (empty($transaction['src'])) {
+                    _log($transaction['id'].' - Transaction has empty src');
                     continue;
                 }
+
                 if (!$this->check($trans, $current['height'])) {
-                    _log("$x[id] - Transaction Check Failed");
+                    _log($transaction['id'].' - Transaction Check Failed');
                     continue;
                 }
 
-                $balance[$x['src']] += $x['val'] + $x['fee'];
-                if ($db->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $x['id']]) > 0) {
+                $balance[$transaction['src']] += $transaction['val'] + $transaction['fee'];
+                if ($db->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $transaction['id']]) > 0) {
                     // Duplicate transaction
-                    _log("$x[id] - Duplicate transaction");
+                    _log($transaction['id'].' - Duplicate transaction');
                     continue;
                 }
 
-                $res = $db->single(
+                $result = $db->single(
                     'SELECT COUNT(1) FROM accounts WHERE id=:id AND balance>=:balance',
-                    [':id' => $x['src'], ':balance' => $balance[$x['src']]]
+                    [':id' => $transaction['src'], ':balance' => $balance[$transaction['src']]]
                 );
 
-                if ($res == 0) {
+                if ($result == 0) {
                     // Not enough balance for the transactions
-                    _log("$x[id] - Not enough funds in balance");
+                    _log($transaction['id'].' - Not enough funds in balance');
                     continue;
                 }
+
                 $i++;
                 ksort($trans);
-                $transactions[$x['id']] = $trans;
+                $transactions[$transaction['id']] = $trans;
             }
         }
 
@@ -143,37 +152,41 @@ class Transaction
 
     /**
      * Add a new transaction to Mempool and lock it with the current height.
-     * @param array  $x
+     * @param array  $transactionData
      * @param string $peer
      * @return bool
      */
-    public function addMempool(array $x, string $peer = ''): bool
+    public function addMempool(array $transactionData, string $peer = ''): bool
     {
         global $db;
         $block = new Block();
         $current = $block->current();
+
         $height = $current['height'];
-        $x['id'] = san($x['id']);
+        $transactionData['id'] = san($transactionData['id']);
+
         $bind = [
             ':peer'       => $peer,
-            ':id'         => $x['id'],
-            ':public_key' => $x['public_key'],
+            ':id'         => $transactionData['id'],
+            ':public_key' => $transactionData['public_key'],
             ':height'     => $height,
-            ':src'        => $x['src'],
-            ':dst'        => $x['dst'],
-            ':val'        => $x['val'],
-            ':fee'        => $x['fee'],
-            ':signature'  => $x['signature'],
-            ':version'    => $x['version'],
-            ':date'       => $x['date'],
-            ':message'    => $x['message'],
+            ':src'        => $transactionData['src'],
+            ':dst'        => $transactionData['dst'],
+            ':val'        => $transactionData['val'],
+            ':fee'        => $transactionData['fee'],
+            ':signature'  => $transactionData['signature'],
+            ':version'    => $transactionData['version'],
+            ':date'       => $transactionData['date'],
+            ':message'    => $transactionData['message'],
         ];
+
         $db->run(
             'INSERT into mempool
              SET peer = :peer, id = :id, public_key = :public_key, height = :height, src = :src, dst = :dst,
              val = :val, fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
             $bind
         );
+
         return true;
     }
 
@@ -181,73 +194,82 @@ class Transaction
      * Add a new transaction to the blockchain.
      * @param string $block
      * @param int    $height
-     * @param array  $x
+     * @param array  $transactionData
      * @return bool
      */
-    public function add(string $block, int $height, array $x): bool
+    public function add(string $block, int $height, array $transactionData): bool
     {
         global $db;
         $acc = new Account();
-        $acc->add($x['public_key'], $block);
-        $acc->addId($x['dst'], $block);
-        $x['id'] = san($x['id']);
+
+        $acc->add($transactionData['public_key'], $block);
+        $acc->addId($transactionData['dst'], $block);
+        $transactionData['id'] = san($transactionData['id']);
+
         $bind = [
-            ':id'         => $x['id'],
-            ':public_key' => $x['public_key'],
+            ':id'         => $transactionData['id'],
+            ':public_key' => $transactionData['public_key'],
             ':height'     => $height,
             ':block'      => $block,
-            ':dst'        => $x['dst'],
-            ':val'        => $x['val'],
-            ':fee'        => $x['fee'],
-            ':signature'  => $x['signature'],
-            ':version'    => $x['version'],
-            ':date'       => $x['date'],
-            ':message'    => $x['message'],
+            ':dst'        => $transactionData['dst'],
+            ':val'        => $transactionData['val'],
+            ':fee'        => $transactionData['fee'],
+            ':signature'  => $transactionData['signature'],
+            ':version'    => $transactionData['version'],
+            ':date'       => $transactionData['date'],
+            ':message'    => $transactionData['message'],
         ];
-        $res = $db->run(
+
+        $result = $db->run(
             'INSERT into transactions
              SET id = :id, public_key = :public_key, block = :block,  height = :height, dst = :dst, val = :val,
             fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
             $bind
         );
-        if ($res != 1) {
+
+        if ($result != 1) {
             return false;
         }
+
         $db->run(
             'UPDATE accounts SET balance = balance+:val WHERE id = :id',
-            [":id" => $x['dst'], ":val" => $x['val']]
+            [":id" => $transactionData['dst'], ":val" => $transactionData['val']]
         );
-        // no debit when the transaction is reward
-        if ($x['version'] > 0) {
+
+        // No debit when the transaction is reward
+        if ($transactionData['version'] > 0) {
             $db->run(
                 'UPDATE accounts SET balance = (balance - :val) - :fee WHERE id = :id',
-                [":id" => $x['src'], ":val" => $x['val'], ":fee" => $x['fee']]
+                [":id" => $transactionData['src'], ":val" => $transactionData['val'], ":fee" => $transactionData['fee']]
             );
         }
-        $db->run('DELETE FROM mempool WHERE id = :id', [':id' => $x['id']]);
+
+        $db->run('DELETE FROM mempool WHERE id = :id', [':id' => $transactionData['id']]);
+
         return true;
     }
 
     /**
      * Hash the transaction's most important fields and create the transaction ID.
-     * @param array $x
+     * @param array $transactionData
      * @return string
      */
-    public function hash(array $x): string
+    public function hash(array $transactionData): string
     {
-        $info = $x['val'].'-'.$x['fee'].'-'.$x['dst'].'-'.$x['message'].'-'
-            .$x['version'].'-'.$x['public_key'].'-'.$x['date'].'-'.$x['signature'];
-        $hash = hash("sha512", $info);
+        $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
+            .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
+            .$transactionData['date'].'-'.$transactionData['signature'];
+        $hash = hash('sha512', $transactionInfo);
         return hexToCoin($hash);
     }
 
     /**
      * Check the validity of a transaction.
-     * @param array $x
+     * @param array $transactionData
      * @param int   $height
      * @return bool
      */
-    public function check(array $x, int $height = 0): bool
+    public function check(array $transactionData, int $height = 0): bool
     {
         // If no block is specified, use the current block
         if ($height === 0) {
@@ -257,23 +279,24 @@ class Transaction
         }
 
         $acc = new Account();
-        $info = $x['val'].'-'.$x['fee'].'-'.$x['dst'].'-'.$x['message'].'-'
-            .$x['version'].'-'.$x['public_key'].'-'.$x['date'];
+        $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
+            .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
+            .$transactionData['date'];
 
         // The value must be >=0
-        if ($x['val'] < 0) {
-            _log("$x[id] - Value below 0");
+        if ($transactionData['val'] < 0) {
+            _log($transactionData['id'].' - Value below 0');
             return false;
         }
 
         // The fee must be >=0
-        if ($x['fee'] < 0) {
-            _log("$x[id] - Fee below 0");
+        if ($transactionData['fee'] < 0) {
+            _log($transactionData['id'].' - Fee below 0');
             return false;
         }
 
         // The fee is 0.25%, hardcoded
-        $fee = $x['val'] * 0.0025;
+        $fee = $transactionData['val'] * 0.0025;
         $fee = number_format($fee, 8, ".", "");
         if ($fee < 0.00000001) {
             $fee = 0.00000001;
@@ -283,64 +306,65 @@ class Transaction
             $fee = 10; //10800
         }
         // Added fee does not match
-        if ($fee != $x['fee']) {
-            _log("$x[id] - Fee not 0.25%");
+        if ($fee != $transactionData['fee']) {
+            _log($transactionData['id'].' - Fee not 0.25%');
             return false;
         }
 
         // Invalid destination address
-        if (!$acc->valid($x['dst'])) {
-            _log("$x[id] - Invalid destination address");
+        if (!$acc->valid($transactionData['dst'])) {
+            _log($transactionData['id'].' - Invalid destination address');
             return false;
         }
 
         // Reward transactions are not added via this function
-        if ($x['version'] < 1) {
-            _log("$x[id] - Invalid version <1");
+        if ($transactionData['version'] < 1) {
+            _log($transactionData['id'].' - Invalid version <1');
             return false;
         }
 
         // Public key must be at least 15 chars / probably should be replaced with the validator function
-        if (strlen($x['public_key']) < 15) {
-            _log("$x[id] - Invalid public key size");
+        if (strlen($transactionData['public_key']) < 15) {
+            _log($transactionData['id'].' - Invalid public key size');
             return false;
         }
 
         // No transactions before the genesis
-        if ($x['date'] < 1511725068) {
-            _log("$x[id] - Date before genesis");
+        if ($transactionData['date'] < 1511725068) {
+            _log($transactionData['id'].' - Date before genesis');
             return false;
         }
 
         // No future transactions
-        if ($x['date'] > time() + 86400) {
-            _log("$x[id] - Date in the future");
+        if ($transactionData['date'] > time() + 86400) {
+            _log($transactionData['id'].' - Date in the future');
             return false;
         }
 
         // Prevent the resending of broken base58 transactions
-        if ($height > 16900 && $x['date'] < 1519327780) {
+        if ($height > 16900 && $transactionData['date'] < 1519327780) {
             return false;
         }
 
-        $id = $this->hash($x);
+        $transactionId = $this->hash($transactionData);
 
         // The hash does not match our regenerated hash
-        if ($x['id'] != $id) {
-            // Fix for broken base58 library which was used until block 16900.
+        if ($transactionData['id'] !== $transactionId) {
+            // Fix for broken Base58 library which was used until block 16900.
             // Accept hashes without the first 1 or 2 bytes.
-            $xs = base58Decode($x['id']);
-            if (((strlen($xs) != 63 || substr($id, 1) != $x['id']) && (strlen($xs) != 62 || substr($id, 2) != $x['id']))
+            $xs = base58Decode($transactionData['id']);
+            if (((strlen($xs) !== 63 || substr($transactionId, 1) !== $transactionData['id'])
+                    && (strlen($xs) !== 62 || substr($transactionId, 2) !== $transactionData['id']))
                 || $height > 16900
             ) {
-                _log("$x[id] - $id - Invalid hash");
+                _log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
                 return false;
             }
         }
 
         // Verify the ECDSA signature
-        if (!$acc->checkSignature($info, $x['signature'], $x['public_key'])) {
-            _log("$x[id] - Invalid signature");
+        if (!$acc->checkSignature($transactionInfo, $transactionData['signature'], $transactionData['public_key'])) {
+            _log($transactionData['id'].' - Invalid signature');
             return false;
         }
 
@@ -349,15 +373,16 @@ class Transaction
 
     /**
      * Sign a transaction.
-     * @param array  $x
+     * @param array  $transactionData
      * @param string $privateKey
      * @return string
      */
-    public function sign(array $x, string $privateKey): string
+    public function sign(array $transactionData, string $privateKey): string
     {
-        $info = $x['val'].'-'.$x['fee'].'-'.$x['dst'].'-'.$x['message']."-"
-            .$x['version'].'-'.$x['public_key'].'-'.$x['date'];
-        $signature = ecSign($info, $privateKey);
+        $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
+            .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
+            .$transactionData['date'];
+        $signature = ecSign($transactionInfo, $privateKey);
 
         return $signature;
     }
@@ -370,122 +395,128 @@ class Transaction
     public function export(string $id): array
     {
         global $db;
-        $r = $db->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
-        return $r;
+        return $db->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
     }
 
     /**
      * Get the transaction data as array.
-     * @param string $id
+     * @param string $transactionId
      * @return array|bool
      */
-    public function getTransaction(string $id)
+    public function getTransaction(string $transactionId)
     {
         global $db;
         $acc = new Account();
         $block = new Block();
         $current = $block->current();
 
-        $x = $db->row('SELECT * FROM transactions WHERE id = :id', [':id' => $id]);
+        $transactionData = $db->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
 
-        if (!$x) {
+        if (!$transactionData) {
             return false;
         }
 
-        $trans = [
-            'block'      => $x['block'],
-            'height'     => $x['height'],
-            'id'         => $x['id'],
-            'dst'        => $x['dst'],
-            'val'        => $x['val'],
-            'fee'        => $x['fee'],
-            'signature'  => $x['signature'],
-            'message'    => $x['message'],
-            'version'    => $x['version'],
-            'date'       => $x['date'],
-            'public_key' => $x['public_key'],
+        $transaction = [
+            'block'      => $transactionData['block'],
+            'height'     => $transactionData['height'],
+            'id'         => $transactionData['id'],
+            'dst'        => $transactionData['dst'],
+            'val'        => $transactionData['val'],
+            'fee'        => $transactionData['fee'],
+            'signature'  => $transactionData['signature'],
+            'message'    => $transactionData['message'],
+            'version'    => $transactionData['version'],
+            'date'       => $transactionData['date'],
+            'public_key' => $transactionData['public_key'],
         ];
 
-        $trans['src'] = $acc->getAddress($x['public_key']);
-        $trans['confirmations'] = $current['height'] - $x['height'];
+        $transaction['src'] = $acc->getAddress($transactionData['public_key']);
+        $transaction['confirmations'] = $current['height'] - $transactionData['height'];
 
-        if ($x['version'] == 0) {
-            $trans['type'] = 'mining';
-        } elseif ($x['version'] == 1) {
-            if ($x['dst'] == $id) {
-                $trans['type'] = 'credit';
-            } else {
-                $trans['type'] = 'debit';
+        $transaction['type'] = 'other';
+
+        if ($transactionData['version'] == 0) {
+            $transaction['type'] = 'mining';
+        } elseif ($transactionData['version'] == 1) {
+            $transaction['type'] = 'debit';
+
+            if ($transactionData['dst'] == $transactionId) {
+                $transaction['type'] = 'credit';
             }
-        } else {
-            $trans['type'] = 'other';
         }
 
-        ksort($trans);
-        return $trans;
+        ksort($transaction);
+        return $transaction;
     }
 
     /**
      * Get the transactions for a specific block id or height.
      * @param string $height
-     * @param string $id
+     * @param string $transactionId
      * @return array|bool
      */
-    public function getTransactions($height = '', $id = '')
+    public function getTransactions($height = '', $transactionId = '')
     {
         global $db;
         $block = new Block();
         $current = $block->current();
         $acc = new Account();
-        $height = san($height);
-        $id = san($id);
 
-        if (empty($id) && empty($height)) {
+        $height = san($height);
+        $transactionId = san($transactionId);
+
+        if (empty($transactionId) && empty($height)) {
             return false;
         }
 
-        if (!empty($id)) {
-            $r = $db->run('SELECT * FROM transactions WHERE block = :id AND version > 0', [':id' => $id]);
+        if (!empty($transactionId)) {
+            $transactions = $db->run(
+                'SELECT * FROM transactions WHERE block = :id AND version > 0',
+                [':id' => $transactionId]
+            );
         } else {
-            $r = $db->run('SELECT * FROM transactions WHERE height = :height AND version > 0', [':height' => $height]);
+            $transactions = $db->run(
+                'SELECT * FROM transactions WHERE height = :height AND version > 0',
+                [':height' => $height]
+            );
         }
 
-        $res = [];
-        foreach ($r as $x) {
-            $trans = [
-                'block'      => $x['block'],
-                'height'     => $x['height'],
-                'id'         => $x['id'],
-                'dst'        => $x['dst'],
-                'val'        => $x['val'],
-                'fee'        => $x['fee'],
-                'signature'  => $x['signature'],
-                'message'    => $x['message'],
-                'version'    => $x['version'],
-                'date'       => $x['date'],
-                'public_key' => $x['public_key'],
+        $results = [];
+        foreach ($transactions as $transaction) {
+            $transactionResult = [
+                'block'      => $transaction['block'],
+                'height'     => $transaction['height'],
+                'id'         => $transaction['id'],
+                'dst'        => $transaction['dst'],
+                'val'        => $transaction['val'],
+                'fee'        => $transaction['fee'],
+                'signature'  => $transaction['signature'],
+                'message'    => $transaction['message'],
+                'version'    => $transaction['version'],
+                'date'       => $transaction['date'],
+                'public_key' => $transaction['public_key'],
             ];
 
-            $trans['src'] = $acc->getAddress($x['public_key']);
-            $trans['confirmations'] = $current['height'] - $x['height'];
+            $transactionResult['src'] = $acc->getAddress($transaction['public_key']);
+            $transactionResult['confirmations'] = $current['height'] - $transaction['height'];
 
-            if ($x['version'] == 0) {
-                $trans['type'] = 'mining';
-            } elseif ($x['version'] == 1) {
-                if ($x['dst'] == $id) {
-                    $trans['type'] = 'credit';
+            if ($transaction['version'] == 0) {
+                $transactionResult['type'] = 'mining';
+            } elseif ($transaction['version'] == 1) {
+                if ($transaction['dst'] == $transactionId) {
+                    $transactionResult['type'] = 'credit';
                 } else {
-                    $trans['type'] = 'debit';
+                    $transactionResult['type'] = 'debit';
                 }
             } else {
-                $trans['type'] = 'other';
+                $transactionResult['type'] = 'other';
             }
 
-            ksort($trans);
-            $res[] = $trans;
+            ksort($transactionResult);
+            $results[] = $transactionResult;
         }
 
-        return $res;
+        return $results;
     }
 
     /**
@@ -496,33 +527,33 @@ class Transaction
     public function getMempoolTransaction(string $id)
     {
         global $db;
-        $x = $db->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
+        $transactionData = $db->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
 
-        if (!$x) {
+        if (!$transactionData) {
             return false;
         }
 
-        $trans = [
-            'block'      => $x['block'],
-            'height'     => $x['height'],
-            'id'         => $x['id'],
-            'dst'        => $x['dst'],
-            'val'        => $x['val'],
-            'fee'        => $x['fee'],
-            'signature'  => $x['signature'],
-            'message'    => $x['message'],
-            'version'    => $x['version'],
-            'date'       => $x['date'],
-            'public_key' => $x['public_key'],
+        $transaction = [
+            'block'      => $transactionData['block'],
+            'height'     => $transactionData['height'],
+            'id'         => $transactionData['id'],
+            'dst'        => $transactionData['dst'],
+            'val'        => $transactionData['val'],
+            'fee'        => $transactionData['fee'],
+            'signature'  => $transactionData['signature'],
+            'message'    => $transactionData['message'],
+            'version'    => $transactionData['version'],
+            'date'       => $transactionData['date'],
+            'public_key' => $transactionData['public_key'],
         ];
 
-        $trans['src'] = $x['src'];
+        $transaction['src'] = $transactionData['src'];
 
-        $trans['type'] = 'mempool';
-        $trans['confirmations'] = -1;
+        $transaction['type'] = 'mempool';
+        $transaction['confirmations'] = -1;
 
-        ksort($trans);
+        ksort($transaction);
 
-        return $trans;
+        return $transaction;
     }
 }
