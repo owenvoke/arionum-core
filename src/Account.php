@@ -17,7 +17,13 @@ class Account
     {
         global $db;
         $id = $this->getAddress($publicKey);
-        $bind = [":id" => $id, ":public_key" => $publicKey, ":block" => $block, ":public_key2" => $publicKey];
+        $bind = [
+            ':id'          => $id,
+            ':public_key'  => $publicKey,
+            ':block'       => $block,
+            ':public_key2' => $publicKey,
+        ];
+
         $db->run(
             "INSERT INTO accounts
              SET id=:id, public_key=:public_key, block=:block, balance=0
@@ -36,10 +42,14 @@ class Account
     public function addId(string $id, string $block): void
     {
         global $db;
-        $bind = [":id" => $id, ":block" => $block];
+        $bind = [
+            ':id'    => $id,
+            ':block' => $block,
+        ];
+
         $db->run(
             "INSERT ignore INTO accounts
-             SET id=:id, public_key='', block=:block, balance=0",
+             SET id = :id, public_key = '', block = :block, balance = 0",
             $bind
         );
     }
@@ -51,6 +61,7 @@ class Account
      */
     public function getAddress(string $publicKey): string
     {
+        // Check if the address is a broken block winner
         if ($address = $this->isBrokenBlockWinner($publicKey)) {
             return $address;
         }
@@ -82,43 +93,47 @@ class Account
     public function generateAccount(): array
     {
         // Using secp256k1 curve for ECDSA
-        $args = [
-            "curve_name"       => "secp256k1",
-            "private_key_type" => OPENSSL_KEYTYPE_EC,
+        $arguments = [
+            'curve_name'       => 'secp256k1',
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
         ];
 
         // Generate a new key pair
-        $key1 = openssl_pkey_new($args);
+        $sslPrivateKey = openssl_pkey_new($arguments);
 
         // Export the private key encoded as PEM
-        openssl_pkey_export($key1, $pvkey);
+        openssl_pkey_export($sslPrivateKey, $pemKey);
 
         // Convert the PEM to a Base58 format
-        $privateKey = pemToCoin($pvkey);
+        $privateKey = pemToCoin($pemKey);
 
         // Export the private key encoded as PEM
-        $pub = openssl_pkey_get_details($key1);
+        $sslPublicKey = openssl_pkey_get_details($sslPrivateKey);
 
         // Convert the PEM to a Base58 format
-        $publicKey = pemToCoin($pub['key']);
+        $publicKey = pemToCoin($sslPublicKey['key']);
 
         // Generate the account's address based on the public key
         $address = $this->getAddress($publicKey);
-        return ["address" => $address, "public_key" => $publicKey, "private_key" => $privateKey];
+
+        return [
+            'address'     => $address,
+            'public_key'  => $publicKey,
+            'private_key' => $privateKey,
+        ];
     }
 
     /**
      * Check the validity of a Base58 encoded key.
      * At the moment, it only checks that the characters are Base58.
-     * @param string $id
+     * @param string $base58EncodedKey
      * @return bool
      */
-    public function validKey(string $id): bool
+    public function validKey(string $base58EncodedKey): bool
     {
-        $chars = str_split("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
-        for ($i = 0; $i < strlen($id);
-             $i++) {
-            if (!in_array($id[$i], $chars)) {
+        $allowedCharacters = str_split('123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz');
+        for ($i = 0; $i < strlen($base58EncodedKey); $i++) {
+            if (!in_array($base58EncodedKey[$i], $allowedCharacters)) {
                 return false;
             }
         }
@@ -129,18 +144,18 @@ class Account
     /**
      * Check the validity of an address.
      * At the moment, it checks only that the characters are Base58 and the length is >=70 and <=128.
-     * @param string $id
+     * @param string $address
      * @return bool
      */
-    public function valid(string $id): bool
+    public function valid(string $address): bool
     {
-        if (strlen($id) < 70 || strlen($id) > 128) {
+        if (strlen($address) < 70 || strlen($address) > 128) {
             return false;
         }
-        $chars = str_split("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
-        for ($i = 0; $i < strlen($id);
-             $i++) {
-            if (!in_array($id[$i], $chars)) {
+
+        $chars = str_split('123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz');
+        for ($i = 0; $i < strlen($address); $i++) {
+            if (!in_array($address[$i], $chars)) {
                 return false;
             }
         }
@@ -150,95 +165,101 @@ class Account
 
     /**
      * Get the balance of a specified address.
-     * @param string $id
+     * @param string $address
      * @return string
      */
-    public function balance(string $id): string
+    public function balance(string $address): string
     {
         global $db;
-        $res = $db->single("SELECT balance FROM accounts WHERE id=:id", [":id" => $id]);
-        if ($res === false) {
-            $res = "0.00000000";
+        $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
+
+        if ($balance === false) {
+            $balance = '0.00000000';
         }
 
-        return number_format($res, 8, ".", "");
+        return number_format($balance, 8, '.', '');
     }
 
     /**
      * Get the balance of a specified address, including any pending debits from the Mempool.
-     * @param string $id
+     * @param string $address
      * @return string
      */
-    public function pendingBalance(string $id): string
+    public function pendingBalance(string $address): string
     {
         global $db;
-        $res = $db->single("SELECT balance FROM accounts WHERE id=:id", [":id" => $id]);
-        if ($res === false) {
-            $res = "0.00000000";
+        $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
+        if ($balance === false) {
+            $balance = '0.00000000';
         }
 
         // If the original balance is 0, no mempool transactions are possible
-        if ($res == "0.00000000") {
-            return $res;
+        if ($balance == '0.00000000') {
+            return $balance;
         }
-        $mem = $db->single("SELECT SUM(val+fee) FROM mempool WHERE src=:id", [":id" => $id]);
-        $rez = $res - $mem;
-        return number_format($rez, 8, ".", "");
+
+        $mempoolAmount = $db->single('SELECT SUM(val+fee) FROM mempool WHERE src = :id', [':id' => $address]);
+        $balanceWithoutPending = $balance - $mempoolAmount;
+
+        return number_format($balanceWithoutPending, 8, '.', '');
     }
 
     /**
      * Get transactions for a specific address.
-     * @param string $id
+     * @param string $address
      * @param int    $limit
      * @return array
      */
-    public function getTransactions(string $id, int $limit = 100): array
+    public function getTransactions(string $address, int $limit = 100): array
     {
         global $db;
         $block = new Block();
         $current = $block->current();
-        $publicKey = $this->publicKey($id);
+        $publicKey = $this->publicKey($address);
         $limit = intval($limit);
+
         if ($limit > 100 || $limit < 1) {
             $limit = 100;
         }
-        $res = $db->run(
-            "SELECT * FROM transactions WHERE dst=:dst or public_key=:src ORDER by height DESC LIMIT :limit",
-            [":src" => $publicKey, ":dst" => $id, ":limit" => $limit]
+
+        $result = $db->run(
+            'SELECT * FROM transactions WHERE dst=:dst or public_key=:src ORDER by height DESC LIMIT :limit',
+            [':src' => $publicKey, ':dst' => $address, ':limit' => $limit]
         );
 
         $transactions = [];
-        foreach ($res as $x) {
-            $trans = [
-                "block"      => $x['block'],
-                "height"     => $x['height'],
-                "id"         => $x['id'],
-                "dst"        => $x['dst'],
-                "val"        => $x['val'],
-                "fee"        => $x['fee'],
-                "signature"  => $x['signature'],
-                "message"    => $x['message'],
-                "version"    => $x['version'],
-                "date"       => $x['date'],
-                "public_key" => $x['public_key'],
+        foreach ($result as $transactionData) {
+            $transaction = [
+                'block'      => $transactionData['block'],
+                'height'     => $transactionData['height'],
+                'id'         => $transactionData['id'],
+                'dst'        => $transactionData['dst'],
+                'val'        => $transactionData['val'],
+                'fee'        => $transactionData['fee'],
+                'signature'  => $transactionData['signature'],
+                'message'    => $transactionData['message'],
+                'version'    => $transactionData['version'],
+                'date'       => $transactionData['date'],
+                'public_key' => $transactionData['public_key'],
             ];
-            $trans['src'] = $this->getAddress($x['public_key']);
-            $trans['confirmations'] = $current['height'] - $x['height'];
 
-            // version 0 -> reward transaction, version 1 -> normal transaction
-            if ($x['version'] == 0) {
-                $trans['type'] = "mining";
-            } elseif ($x['version'] == 1) {
-                if ($x['dst'] == $id) {
-                    $trans['type'] = "credit";
-                } else {
-                    $trans['type'] = "debit";
+            $transaction['src'] = $this->getAddress($transactionData['public_key']);
+            $transaction['confirmations'] = $current['height'] - $transactionData['height'];
+
+            // Version 0 -> reward transaction, version 1 -> normal transaction
+            $transaction['type'] = "other";
+            if ($transactionData['version'] == 0) {
+                $transaction['type'] = "mining";
+            } elseif ($transactionData['version'] == 1) {
+                $transaction['type'] = "debit";
+
+                if ($transactionData['dst'] == $address) {
+                    $transaction['type'] = "credit";
                 }
-            } else {
-                $trans['type'] = "other";
             }
-            ksort($trans);
-            $transactions[] = $trans;
+
+            ksort($transaction);
+            $transactions[] = $transaction;
         }
 
         return $transactions;
@@ -246,53 +267,54 @@ class Account
 
     /**
      * Get Mempool transactions from a specific address.
-     * @param string $id
+     * @param string $address
      * @return array
      */
-    public function getMempoolTransactions(string $id): array
+    public function getMempoolTransactions(string $address): array
     {
         global $db;
         $transactions = [];
-        $res = $db->run(
-            "SELECT * FROM mempool WHERE src=:src ORDER by height DESC LIMIT 100",
-            [":src" => $id, ":dst" => $id]
+        $result = $db->run(
+            'SELECT * FROM mempool WHERE src = :src ORDER by height DESC LIMIT 100',
+            [':src' => $address, ':dst' => $address]
         );
-        foreach ($res as $x) {
-            $trans = [
-                "block"      => $x['block'],
-                "height"     => $x['height'],
-                "id"         => $x['id'],
-                "src"        => $x['src'],
-                "dst"        => $x['dst'],
-                "val"        => $x['val'],
-                "fee"        => $x['fee'],
-                "signature"  => $x['signature'],
-                "message"    => $x['message'],
-                "version"    => $x['version'],
-                "date"       => $x['date'],
-                "public_key" => $x['public_key'],
+
+        foreach ($result as $transactionData) {
+            $transaction = [
+                'block'      => $transactionData['block'],
+                'height'     => $transactionData['height'],
+                'id'         => $transactionData['id'],
+                'src'        => $transactionData['src'],
+                'dst'        => $transactionData['dst'],
+                'val'        => $transactionData['val'],
+                'fee'        => $transactionData['fee'],
+                'signature'  => $transactionData['signature'],
+                'message'    => $transactionData['message'],
+                'version'    => $transactionData['version'],
+                'date'       => $transactionData['date'],
+                'public_key' => $transactionData['public_key'],
             ];
-            $trans['type'] = "mempool";
+            $transaction['type'] = 'mempool';
 
             // They are unconfirmed, so they will have -1 confirmations.
-            $trans['confirmations'] = -1;
+            $transaction['confirmations'] = -1;
 
-            ksort($trans);
-            $transactions[] = $trans;
+            ksort($transaction);
+            $transactions[] = $transaction;
         }
+
         return $transactions;
     }
 
     /**
      * Return the public key for a specific account.
-     * @param string $id
+     * @param string $address
      * @return string
      */
-    public function publicKey(string $id): string
+    public function publicKey(string $address): string
     {
         global $db;
-        $res = $db->single("SELECT public_key FROM accounts WHERE id=:id", [":id" => $id]);
-        return $res;
+        return $db->single('SELECT public_key FROM accounts WHERE id = :id', [':id' => $address]);
     }
 
     /**
