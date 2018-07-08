@@ -37,8 +37,13 @@ function sanHost(string $hostAddress): string
 function apiErr($data): void
 {
     global $_config;
-    echo json_encode(["status" => "error", "data" => $data, "coin" => $_config['coin']]);
-    exit;
+    exit(json_encode(
+        [
+            'status' => 'error',
+            'data'   => $data,
+            'coin'   => $_config['coin'],
+        ]
+    ));
 }
 
 /**
@@ -49,8 +54,13 @@ function apiErr($data): void
 function apiEcho($data): void
 {
     global $_config;
-    echo json_encode(["status" => "ok", "data" => $data, "coin" => $_config['coin']]);
-    exit;
+    exit(json_encode(
+        [
+            'status' => 'ok',
+            'data'   => $data,
+            'coin'   => $_config['coin'],
+        ]
+    ));
 }
 
 /**
@@ -338,46 +348,50 @@ function peerPost(string $url, array $data = [], int $timeout = 60, bool $debug 
     if ($debug) {
         echo "\nPeer post: $url\n";
     }
-    $postdata = http_build_query(
+
+    $postData = http_build_query(
         [
             'data' => json_encode($data),
             "coin" => $_config['coin'],
         ]
     );
 
-    $opts = [
+    $options = [
         'http' =>
             [
                 'timeout' => $timeout,
                 'method'  => 'POST',
                 'header'  => 'Content-type: application/x-www-form-urlencoded',
-                'content' => $postdata,
+                'content' => $postData,
             ],
     ];
 
-    $context = stream_context_create($opts);
+    $context = stream_context_create($options);
 
-    $result = file_get_contents($url, false, $context);
+    $peerResponse = file_get_contents($url, false, $context);
+
     if ($debug) {
-        echo "\nPeer response: $result\n";
+        echo "\nPeer response: $peerResponse\n";
     }
-    $res = json_decode($result, true);
 
-    // the function will return false if something goes wrong
-    if ($res['status'] != "ok" || $res['coin'] != $_config['coin']) {
+    $result = json_decode($peerResponse, true);
+
+    // The function will return false if something goes wrong
+    if ($result['status'] !== 'ok' || $result['coin'] !== $_config['coin']) {
         return false;
     }
-    return $res['data'];
+
+    return $result['data'];
 }
 
 /**
  * Convert hexadecimal data to Base58.
- * @param string $hex
+ * @param string $hexadecimalData
  * @return string
  */
-function hexToCoin(string $hex): string
+function hexToCoin(string $hexadecimalData): string
 {
-    $data = hex2bin($hex);
+    $data = hex2bin($hexadecimalData);
     return base58Encode($data);
 }
 
