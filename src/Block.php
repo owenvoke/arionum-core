@@ -31,6 +31,7 @@ class Block
         string $rewardSignature,
         string $argon
     ): bool {
+        /** @global DB $db */
         global $db;
         $acc = new Account();
         $trx = new Transaction();
@@ -150,12 +151,15 @@ class Block
      */
     public function current()
     {
+        /** @global DB $db */
         global $db;
         $current = $db->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1');
+
         if (!$current) {
             $this->genesis();
-            return $this->current(true);
+            return $this->current();
         }
+
         return $current;
     }
 
@@ -165,10 +169,9 @@ class Block
      */
     public function prev()
     {
+        /** @global DB $db */
         global $db;
-        $current = $db->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1,1');
-
-        return $current;
+        return $db->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1,1');
     }
 
     /**
@@ -179,14 +182,11 @@ class Block
      */
     public function difficulty(int $height = 0)
     {
+        /** @global DB $db */
         global $db;
 
         // If no block height is specified, use the current block.
-        if ($height == 0) {
-            $current = $this->current();
-        } else {
-            $current = $this->get($height);
-        }
+        $current = ($height === 0) ? $this->current() : $this->get($height);
 
         $height = $current['height'];
 
@@ -250,6 +250,7 @@ class Block
      */
     public function maxTransactions()
     {
+        /** @global DB $db */
         global $db;
         $current = $this->current();
         $limit = $current['height'] - 100;
@@ -423,6 +424,7 @@ class Block
         int $currentId = 0,
         int $currentHeight = 0
     ): bool {
+        /** @global array $_config */
         global $_config;
 
         // If no id is specified, we use the current
@@ -499,6 +501,7 @@ class Block
      */
     public function parseBlock(string $block, int $height, array $data, bool $test = true): bool
     {
+        /** @global DB $db */
         global $db;
 
         // Data must be an array
@@ -572,7 +575,6 @@ class Block
      */
     private function genesis(): void
     {
-        global $db;
         // phpcs:disable Generic.Files.LineLength
         $signature = 'AN1rKvtLTWvZorbiiNk5TBYXLgxiLakra2byFef9qoz1bmRzhQheRtiWivfGSwP6r8qHJGrf8uBeKjNZP1GZvsdKUVVN2XQoL';
         $generator = '2P67zUANj7NRKTruQ8nJRHNdKMroY6gLw4NjptTVmYk6Hh1QPYzzfEa9z4gv8qJhuhCNM8p9GDAEDqGUU1awaLW6';
@@ -626,6 +628,7 @@ class Block
             $height = 2;
         }
 
+        /** @global DB $db */
         global $db;
         $trx = new Transaction();
 
@@ -670,6 +673,7 @@ class Block
      */
     public function deleteId(string $id): bool
     {
+        /** @global DB $db */
         global $db;
         $trx = new Transaction();
 
@@ -777,6 +781,7 @@ class Block
             return false;
         }
 
+        /** @global DB $db */
         global $db;
 
         if (!empty($height)) {
@@ -831,6 +836,7 @@ class Block
      */
     public function get(int $height)
     {
+        /** @global DB $db */
         global $db;
         if (empty($height)) {
             return false;

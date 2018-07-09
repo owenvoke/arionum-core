@@ -14,6 +14,7 @@ class Transaction
      */
     public function reverse(string $block): bool
     {
+        /** @global DB $db */
         global $db;
         $account = new Account();
         $transactions = $db->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
@@ -56,6 +57,7 @@ class Transaction
      */
     public function cleanMempool(): void
     {
+        /** @global DB $db */
         global $db;
         $block = new Block();
         $current = $block->current();
@@ -73,6 +75,7 @@ class Transaction
      */
     public function mempool(int $max): array
     {
+        /** @global DB $db */
         global $db;
         $block = new Block();
 
@@ -158,6 +161,7 @@ class Transaction
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
+        /** @global DB $db */
         global $db;
         $block = new Block();
         $current = $block->current();
@@ -199,6 +203,7 @@ class Transaction
      */
     public function add(string $block, int $height, array $transactionData): bool
     {
+        /** @global DB $db */
         global $db;
         $acc = new Account();
 
@@ -394,6 +399,7 @@ class Transaction
      */
     public function export(string $id): array
     {
+        /** @global DB $db */
         global $db;
         return $db->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
     }
@@ -405,6 +411,7 @@ class Transaction
      */
     public function getTransaction(string $transactionId)
     {
+        /** @global DB $db */
         global $db;
         $acc = new Account();
         $block = new Block();
@@ -457,6 +464,7 @@ class Transaction
      */
     public function getTransactions($height = '', $transactionId = '')
     {
+        /** @global DB $db */
         global $db;
         $block = new Block();
         $current = $block->current();
@@ -526,6 +534,7 @@ class Transaction
      */
     public function getMempoolTransaction(string $id)
     {
+        /** @global DB $db */
         global $db;
         $transactionData = $db->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
 

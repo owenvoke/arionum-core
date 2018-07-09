@@ -36,6 +36,7 @@ function sanHost(string $hostAddress): string
  */
 function apiErr($data): void
 {
+    /** @global array $_config */
     global $_config;
     exit(json_encode(
         [
@@ -53,6 +54,7 @@ function apiErr($data): void
  */
 function apiEcho($data): void
 {
+    /** @global array $_config */
     global $_config;
     exit(json_encode(
         [
@@ -344,6 +346,7 @@ function ecVerify(string $data, string $signature, string $key)
  */
 function peerPost(string $url, array $data = [], int $timeout = 60, bool $debug = false): bool
 {
+    /** @global array $_config */
     global $_config;
     if ($debug) {
         echo "\nPeer post: $url\n";

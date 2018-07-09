@@ -15,6 +15,7 @@ class Account
      */
     public function add(string $publicKey, string $block): void
     {
+        /** @global DB $db */
         global $db;
         $id = $this->getAddress($publicKey);
         $bind = [
@@ -41,6 +42,7 @@ class Account
      */
     public function addId(string $id, string $block): void
     {
+        /** @global DB $db */
         global $db;
         $bind = [
             ':id'    => $id,
@@ -170,6 +172,7 @@ class Account
      */
     public function balance(string $address): string
     {
+        /** @global DB $db */
         global $db;
         $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
 
@@ -187,6 +190,7 @@ class Account
      */
     public function pendingBalance(string $address): string
     {
+        /** @global DB $db */
         global $db;
         $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
         if ($balance === false) {
@@ -212,6 +216,7 @@ class Account
      */
     public function getTransactions(string $address, int $limit = 100): array
     {
+        /** @global DB $db */
         global $db;
         $block = new Block();
         $current = $block->current();
@@ -272,6 +277,7 @@ class Account
      */
     public function getMempoolTransactions(string $address): array
     {
+        /** @global DB $db */
         global $db;
         $transactions = [];
         $result = $db->run(
@@ -313,6 +319,7 @@ class Account
      */
     public function publicKey(string $address): string
     {
+        /** @global DB $db */
         global $db;
         return $db->single('SELECT public_key FROM accounts WHERE id = :id', [':id' => $address]);
     }
