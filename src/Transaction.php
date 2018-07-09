@@ -87,7 +87,7 @@ class Transaction
             'SELECT * FROM mempool WHERE height <= :height ORDER by val/fee DESC LIMIT :max',
             [':height' => $height, ':max' => $max + 50]
         );
-        $transactions = [];
+        $results = [];
         if (count($transactions) > 0) {
             $i = 0;
             $balance = [];
@@ -143,14 +143,14 @@ class Transaction
 
                 $i++;
                 ksort($trans);
-                $transactions[$transaction['id']] = $trans;
+                $results[$transaction['id']] = $trans;
             }
         }
 
         // Always sort the array
-        ksort($transactions);
+        ksort($results);
 
-        return $transactions;
+        return $results;
     }
 
     /**
