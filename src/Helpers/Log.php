@@ -49,7 +49,7 @@ class Log
         $date = date('[Y-m-d H:i:s]');
         $trace = debug_backtrace();
         $traceData = $trace[count($trace) - 1];
-        $file = substr($traceData['file'], strrpos($traceData['file'], '/') + 1);
+        $file = substr($traceData['file'], strrpos($traceData['file'], DIRECTORY_SEPARATOR) + 1);
 
         $logInfo = $date.' '.$file.':'.$traceData['line'];
 
