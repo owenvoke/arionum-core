@@ -11,6 +11,7 @@ class Transaction extends Model
      * Reverse and remove all transactions from a block.
      * @param string $block
      * @return bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function reverse(string $block): bool
     {
@@ -52,6 +53,7 @@ class Transaction extends Model
     /**
      * Clear the Mempool.
      * @return void
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function cleanMempool(): void
     {
@@ -68,6 +70,7 @@ class Transaction extends Model
      * Get 'x' transactions from Mempool.
      * @param int $max
      * @return array
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function mempool(int $max): array
     {
@@ -119,8 +122,9 @@ class Transaction extends Model
 
                 $balance[$transaction['src']] += $transaction['val'] + $transaction['fee'];
                 if ($this->database->single(
-                        'SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $transaction['id']]
-                    ) > 0
+                    'SELECT COUNT(1) FROM transactions WHERE id=:id',
+                    [':id' => $transaction['id']]
+                ) > 0
                 ) {
                     // Duplicate transaction
                     _log($transaction['id'].' - Duplicate transaction');
@@ -155,6 +159,7 @@ class Transaction extends Model
      * @param array  $transactionData
      * @param string $peer
      * @return bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
@@ -266,6 +271,7 @@ class Transaction extends Model
      * @param array $transactionData
      * @param int   $height
      * @return bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function check(array $transactionData, int $height = 0): bool
     {
@@ -399,6 +405,7 @@ class Transaction extends Model
      * Get the transaction data as array.
      * @param string $transactionId
      * @return array|bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function getTransaction(string $transactionId)
     {
@@ -450,6 +457,7 @@ class Transaction extends Model
      * @param string $height
      * @param string $transactionId
      * @return array|bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function getTransactions($height = '', $transactionId = '')
     {

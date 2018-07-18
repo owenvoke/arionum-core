@@ -208,6 +208,7 @@ class Account extends Model
      * @param string $address
      * @param int    $limit
      * @return array
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function getTransactions(string $address, int $limit = 100): array
     {

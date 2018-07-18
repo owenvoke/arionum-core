@@ -19,6 +19,7 @@ class Block extends Model
      * @param string $rewardSignature
      * @param string $argon
      * @return bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function add(
         int $height,
@@ -142,6 +143,7 @@ class Block extends Model
     /**
      * Get the current block, without the transactions.
      * @return array
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function current()
     {
@@ -169,6 +171,7 @@ class Block extends Model
      * The higher the difficulty number, the easier it is to win a block.
      * @param int $height
      * @return bool|int|mixed|string
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function difficulty(int $height = 0)
     {
@@ -234,6 +237,7 @@ class Block extends Model
      * Calculate the maximum block size.
      * Increase by 10% the number of transactions if >100 on the last 100 blocks.
      * @return float|int
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function maxTransactions()
     {
@@ -486,6 +490,7 @@ class Block extends Model
      * @param array  $data
      * @param bool   $test
      * @return bool
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function parseBlock(string $block, int $height, array $data, bool $test = true): bool
     {
@@ -557,6 +562,7 @@ class Block extends Model
     /**
      * Initialise the blockchain and add the genesis block.
      * @return void
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     private function genesis(): void
     {
@@ -587,7 +593,7 @@ class Block extends Model
         );
 
         if (!$res) {
-            apiErr('Could not add the genesis block.');
+            apiErr('Could not add the genesis block.', $this->config);
         }
     }
 
@@ -595,6 +601,7 @@ class Block extends Model
      * Remove the last 'x' number of blocks.
      * @param int $blocksToRemove
      * @return void
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function pop($blocksToRemove = 1): void
     {
@@ -774,8 +781,10 @@ class Block extends Model
             return false;
         }
 
-        $r = $this->database->run('SELECT * FROM transactions WHERE version > 0 AND block = :block',
-            [":block" => $block['id']]);
+        $r = $this->database->run(
+            'SELECT * FROM transactions WHERE version > 0 AND block = :block',
+            [":block" => $block['id']]
+        );
         $transactions = [];
 
         foreach ($r as $x) {

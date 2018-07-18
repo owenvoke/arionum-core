@@ -1,5 +1,7 @@
 <?php
 
+use Arionum\Arionum\Config;
+
 /**
  * Sanitise data to only allow alphanumeric characters.
  * @param string $input
@@ -31,36 +33,36 @@ function sanHost(string $hostAddress): string
 
 /**
  * Output an API error and exit.
- * @param mixed $data
+ * @param mixed  $data
+ * @param Config $config
  * @return void
+ * @throws \Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException
  */
-function apiErr($data): void
+function apiErr($data, Config $config): void
 {
-    /** @global array $_config */
-    global $_config;
     exit(json_encode(
         [
             'status' => 'error',
             'data'   => $data,
-            'coin'   => $_config['coin'],
+            'coin'   => $config->get('coin'),
         ]
     ));
 }
 
 /**
  * Output an API 'ok' response and exit.
- * @param mixed $data
+ * @param mixed  $data
+ * @param Config $config
  * @return void
+ * @throws \Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException
  */
-function apiEcho($data): void
+function apiEcho($data, Config $config): void
 {
-    /** @global array $_config */
-    global $_config;
     exit(json_encode(
         [
             'status' => 'ok',
             'data'   => $data,
-            'coin'   => $_config['coin'],
+            'coin'   => $config->get('coin'),
         ]
     ));
 }
@@ -144,7 +146,7 @@ function hexToPem(string $data, bool $isPrivateKey = false): string
  * @param string $string
  * @return bool|string
  * @author Stephen Hill
- * @link https://github.com/stephen-hill/base58php
+ * @link   https://github.com/stephen-hill/base58php
  */
 function base58Encode(string $string)
 {
@@ -200,7 +202,7 @@ function base58Encode(string $string)
  * @param string $base58
  * @return bool|string
  * @author Stephen Hill
- * @link https://github.com/stephen-hill/base58php
+ * @link   https://github.com/stephen-hill/base58php
  */
 function base58Decode(string $base58)
 {
@@ -301,8 +303,6 @@ function ecSign($data, string $key)
     $privateKey = coinToPem($key, true);
 
     $pKey = openssl_pkey_get_private($privateKey);
-
-    $k = openssl_pkey_get_details($pKey);
 
     openssl_sign($data, $signature, $pKey, OPENSSL_ALGO_SHA256);
 
