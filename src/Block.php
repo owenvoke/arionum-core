@@ -2,6 +2,8 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
+
 /**
  * Class Block
  */
@@ -731,7 +733,7 @@ class Block extends Model
         $json = json_encode($data);
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
 
-        $signature = ecSign($info, $key);
+        $signature = Keys::ecSign($info, $key);
         return $signature;
     }
 
@@ -760,7 +762,7 @@ class Block extends Model
     ): string {
         $json = json_encode($data);
         $hash = hash('sha512', "{$publicKey}-{$height}-{$date}-{$nonce}-{$json}-{$signature}-{$difficulty}-{$argon}");
-        return hexToCoin($hash);
+        return Keys::hexToCoin($hash);
     }
 
     /**

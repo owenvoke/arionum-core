@@ -2,6 +2,7 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
 use StephenHill\Base58;
 
 /**
@@ -86,7 +87,7 @@ class Account extends Model
      */
     public function checkSignature(string $data, string $signature, string $publicKey): bool
     {
-        return ecVerify($data, $signature, $publicKey);
+        return Keys::ecVerify($data, $signature, $publicKey);
     }
 
     /**
@@ -109,13 +110,13 @@ class Account extends Model
         openssl_pkey_export($sslPrivateKey, $pemKey);
 
         // Convert the PEM to a Base58 format
-        $privateKey = pemToCoin($pemKey);
+        $privateKey = Keys::pemToCoin($pemKey);
 
         // Export the private key encoded as PEM
         $sslPublicKey = openssl_pkey_get_details($sslPrivateKey);
 
         // Convert the PEM to a Base58 format
-        $publicKey = pemToCoin($sslPublicKey['key']);
+        $publicKey = Keys::pemToCoin($sslPublicKey['key']);
 
         // Generate the account's address based on the public key
         $address = $this->getAddress($publicKey);

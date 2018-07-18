@@ -2,6 +2,7 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
 use StephenHill\Base58;
 
 /**
@@ -267,7 +268,7 @@ class Transaction extends Model
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'].'-'.$transactionData['signature'];
         $hash = hash('sha512', $transactionInfo);
-        return hexToCoin($hash);
+        return Keys::hexToCoin($hash);
     }
 
     /**
@@ -391,7 +392,7 @@ class Transaction extends Model
         $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'];
-        $signature = ecSign($transactionInfo, $privateKey);
+        $signature = Keys::ecSign($transactionInfo, $privateKey);
 
         return $signature;
     }
