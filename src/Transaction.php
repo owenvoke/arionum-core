@@ -5,7 +5,7 @@ namespace Arionum\Arionum;
 /**
  * Class Transaction
  */
-class Transaction
+class Transaction extends Model
 {
     /**
      * Reverse and remove all transactions from a block.
@@ -14,24 +14,22 @@ class Transaction
      */
     public function reverse(string $block): bool
     {
-        /** @global DB $db */
-        global $db;
-        $account = new Account();
-        $transactions = $db->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
+        $account = new Account($this->config, $this->database);
+        $transactions = $this->database->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
 
         foreach ($transactions as $transaction) {
             if (empty($transaction['src'])) {
                 $transaction['src'] = $account->getAddress($transaction['public_key']);
             }
 
-            $db->run(
+            $this->database->run(
                 'UPDATE accounts SET balance = balance - :val WHERE id = :id',
                 [':id' => $transaction['dst'], ':val' => $transaction['val']]
             );
 
             // On version 0 / reward transaction, don't credit anyone
             if ($transaction['version'] > 0) {
-                $db->run(
+                $this->database->run(
                     'UPDATE accounts SET balance = balance + :val WHERE id = :id',
                     [':id' => $transaction['src'], ':val' => $transaction['val'] + $transaction['fee']]
                 );
@@ -42,7 +40,7 @@ class Transaction
                 $this->addMempool($transaction);
             }
 
-            $result = $db->run('DELETE FROM transactions WHERE id = :id', [':id' => $transaction['id']]);
+            $result = $this->database->run('DELETE FROM transactions WHERE id = :id', [':id' => $transaction['id']]);
             if ($result != 1) {
                 return false;
             }
@@ -57,15 +55,13 @@ class Transaction
      */
     public function cleanMempool(): void
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
         $height = $current['height'];
         $limit = $height - 1000;
 
-        $db->run('DELETE FROM mempool WHERE height < :limit', [':limit' => $limit]);
+        $this->database->run('DELETE FROM mempool WHERE height < :limit', [':limit' => $limit]);
     }
 
     /**
@@ -75,15 +71,13 @@ class Transaction
      */
     public function mempool(int $max): array
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
 
         $current = $block->current();
         $height = $current['height'] + 1;
 
         // Only get the transactions that are not locked with a future height
-        $transactions = $db->run(
+        $transactions = $this->database->run(
             'SELECT * FROM mempool WHERE height <= :height ORDER by val/fee DESC LIMIT :max',
             [':height' => $height, ':max' => $max + 50]
         );
@@ -124,13 +118,16 @@ class Transaction
                 }
 
                 $balance[$transaction['src']] += $transaction['val'] + $transaction['fee'];
-                if ($db->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $transaction['id']]) > 0) {
+                if ($this->database->single(
+                        'SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $transaction['id']]
+                    ) > 0
+                ) {
                     // Duplicate transaction
                     _log($transaction['id'].' - Duplicate transaction');
                     continue;
                 }
 
-                $result = $db->single(
+                $result = $this->database->single(
                     'SELECT COUNT(1) FROM accounts WHERE id=:id AND balance>=:balance',
                     [':id' => $transaction['src'], ':balance' => $balance[$transaction['src']]]
                 );
@@ -161,9 +158,7 @@ class Transaction
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
         $height = $current['height'];
@@ -184,7 +179,7 @@ class Transaction
             ':message'    => $transactionData['message'],
         ];
 
-        $db->run(
+        $this->database->run(
             'INSERT into mempool
              SET peer = :peer, id = :id, public_key = :public_key, height = :height, src = :src, dst = :dst,
              val = :val, fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
@@ -203,9 +198,7 @@ class Transaction
      */
     public function add(string $block, int $height, array $transactionData): bool
     {
-        /** @global DB $db */
-        global $db;
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
 
         $acc->add($transactionData['public_key'], $block);
         $acc->addId($transactionData['dst'], $block);
@@ -225,7 +218,7 @@ class Transaction
             ':message'    => $transactionData['message'],
         ];
 
-        $result = $db->run(
+        $result = $this->database->run(
             'INSERT into transactions
              SET id = :id, public_key = :public_key, block = :block,  height = :height, dst = :dst, val = :val,
             fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
@@ -236,20 +229,20 @@ class Transaction
             return false;
         }
 
-        $db->run(
+        $this->database->run(
             'UPDATE accounts SET balance = balance+:val WHERE id = :id',
             [":id" => $transactionData['dst'], ":val" => $transactionData['val']]
         );
 
         // No debit when the transaction is reward
         if ($transactionData['version'] > 0) {
-            $db->run(
+            $this->database->run(
                 'UPDATE accounts SET balance = (balance - :val) - :fee WHERE id = :id',
                 [":id" => $transactionData['src'], ":val" => $transactionData['val'], ":fee" => $transactionData['fee']]
             );
         }
 
-        $db->run('DELETE FROM mempool WHERE id = :id', [':id' => $transactionData['id']]);
+        $this->database->run('DELETE FROM mempool WHERE id = :id', [':id' => $transactionData['id']]);
 
         return true;
     }
@@ -278,12 +271,12 @@ class Transaction
     {
         // If no block is specified, use the current block
         if ($height === 0) {
-            $block = new Block();
+            $block = new Block($this->config, $this->database);
             $current = $block->current();
             $height = $current['height'];
         }
 
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
         $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'];
@@ -399,9 +392,7 @@ class Transaction
      */
     public function export(string $id): array
     {
-        /** @global DB $db */
-        global $db;
-        return $db->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
+        return $this->database->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
     }
 
     /**
@@ -411,13 +402,11 @@ class Transaction
      */
     public function getTransaction(string $transactionId)
     {
-        /** @global DB $db */
-        global $db;
-        $acc = new Account();
-        $block = new Block();
+        $acc = new Account($this->config, $this->database);
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
-        $transactionData = $db->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
+        $transactionData = $this->database->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
 
         if (!$transactionData) {
             return false;
@@ -464,11 +453,9 @@ class Transaction
      */
     public function getTransactions($height = '', $transactionId = '')
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
 
         $height = san($height);
         $transactionId = san($transactionId);
@@ -478,12 +465,12 @@ class Transaction
         }
 
         if (!empty($transactionId)) {
-            $transactions = $db->run(
+            $transactions = $this->database->run(
                 'SELECT * FROM transactions WHERE block = :id AND version > 0',
                 [':id' => $transactionId]
             );
         } else {
-            $transactions = $db->run(
+            $transactions = $this->database->run(
                 'SELECT * FROM transactions WHERE height = :height AND version > 0',
                 [':height' => $height]
             );
@@ -534,9 +521,7 @@ class Transaction
      */
     public function getMempoolTransaction(string $id)
     {
-        /** @global DB $db */
-        global $db;
-        $transactionData = $db->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
+        $transactionData = $this->database->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
 
         if (!$transactionData) {
             return false;
