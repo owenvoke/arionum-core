@@ -2,6 +2,8 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException;
+
 /**
  * Class Config
  */
@@ -24,7 +26,7 @@ class Config
     /**
      * @param string $key
      * @return mixed|null
-     * @throws \Exception
+     * @throws ConfigPropertyNotFoundException
      */
     public function get(string $key)
     {
