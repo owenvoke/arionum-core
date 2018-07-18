@@ -3,42 +3,6 @@
 use StephenHill\Base58;
 
 /**
- * Log function, this only shows in the CLI.
- * @param string $data
- * @return void
- *
- * @todo Convert to Monolog
- * @link https://github.com/pxgamer/arionum/issues/3
- */
-function _log(string $data): void
-{
-    $date = date("[Y-m-d H:i:s]");
-    $trace = debug_backtrace();
-    $loc = count($trace) - 1;
-    $file = substr($trace[$loc]['file'], strrpos($trace[$loc]['file'], "/") + 1);
-
-    $res = "$date ".$file.":".$trace[$loc]['line'];
-
-    if (!empty($trace[$loc]['class'])) {
-        $res .= "---".$trace[$loc]['class'];
-    }
-
-    if (!empty($trace[$loc]['function']) && $trace[$loc]['function'] != '_log') {
-        $res .= '->'.$trace[$loc]['function'].'()';
-    }
-
-    $res .= " $data \n";
-    if (php_sapi_name() === 'cli') {
-        echo $res;
-    }
-
-    global $_config;
-    if ($_config['enable_logging'] == true) {
-        @file_put_contents($_config['log_file'], $res, FILE_APPEND);
-    }
-}
-
-/**
  * Convert a PEM key to hexadecimal.
  * @param string $data
  * @return string

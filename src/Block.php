@@ -53,12 +53,12 @@ class Block extends Model
         // Create the block data and check it against the signature
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
         if (!$acc->checkSignature($info, $signature, $publicKey)) {
-            _log('Block signature check failed');
+            $this->log->log('Block signature check failed');
             return false;
         }
 
         if (!$this->parseBlock($hash, $height, $data, true)) {
-            _log('Parse block failed');
+            $this->log->log('Parse block failed');
             return false;
         }
 
@@ -90,7 +90,7 @@ class Block extends Model
             .$transaction['version'].'-'.$transaction['public_key'].'-'.$transaction['date'];
 
         if (!$acc->checkSignature($info, $rewardSignature, $publicKey)) {
-            _log('Reward signature failed');
+            $this->log->log('Reward signature failed');
             return false;
         }
 
@@ -118,7 +118,7 @@ class Block extends Model
 
         if ($res !== 1) {
             // Rollback and exit if it fails
-            _log('Block DB insert failed');
+            $this->log->log('Block DB insert failed');
             $this->database->rollback();
             $this->database->exec('UNLOCK TABLES');
 
@@ -296,26 +296,26 @@ class Block extends Model
     {
         // Argon must have at least 20 chars
         if (strlen($data['argon']) < 20) {
-            _log("Invalid block argon - $data[argon]");
+            $this->log->log("Invalid block argon - $data[argon]");
             return false;
         }
         $acc = new Account($this->config, $this->database);
 
         // Generators public key must be valid
         if (!$acc->validKey($data['public_key'])) {
-            _log("Invalid public key - $data[public_key]");
+            $this->log->log("Invalid public key - $data[public_key]");
             return false;
         }
 
         // Difficulty should be the same as our calculation
         if ($data['difficulty'] != $this->difficulty()) {
-            _log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
+            $this->log->log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
             return false;
         }
 
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($data['public_key'], $data['nonce'], $data['argon'])) {
-            _log('Mine check failed');
+            $this->log->log('Mine check failed');
             return false;
         }
 
@@ -335,7 +335,7 @@ class Block extends Model
     {
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($publicKey, $nonce, $argon)) {
-            _log('Forge failed - Invalid argon');
+            $this->log->log('Forge failed - Invalid argon');
             return false;
         }
 
@@ -344,7 +344,7 @@ class Block extends Model
         $height = $current['height'] += 1;
         $date = time();
         if ($date <= $current['date']) {
-            _log('Forge failed - Date older than last block');
+            $this->log->log('Forge failed - Date older than last block');
             return false;
         }
 
@@ -393,7 +393,7 @@ class Block extends Model
         );
 
         if (!$result) {
-            _log('Forge failed - Block->Add() failed');
+            $this->log->log('Forge failed - Block->Add() failed');
             return false;
         }
 

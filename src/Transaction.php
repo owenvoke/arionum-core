@@ -108,17 +108,17 @@ class Transaction extends Model
                 }
 
                 if (empty($transaction['public_key'])) {
-                    _log($transaction['id'].' - Transaction has empty public_key');
+                    $this->log->log($transaction['id'].' - Transaction has empty public_key');
                     continue;
                 }
 
                 if (empty($transaction['src'])) {
-                    _log($transaction['id'].' - Transaction has empty src');
+                    $this->log->log($transaction['id'].' - Transaction has empty src');
                     continue;
                 }
 
                 if (!$this->check($trans, $current['height'])) {
-                    _log($transaction['id'].' - Transaction Check Failed');
+                    $this->log->log($transaction['id'].' - Transaction Check Failed');
                     continue;
                 }
 
@@ -129,7 +129,7 @@ class Transaction extends Model
                 ) > 0
                 ) {
                     // Duplicate transaction
-                    _log($transaction['id'].' - Duplicate transaction');
+                    $this->log->log($transaction['id'].' - Duplicate transaction');
                     continue;
                 }
 
@@ -140,7 +140,7 @@ class Transaction extends Model
 
                 if ($result == 0) {
                     // Not enough balance for the transactions
-                    _log($transaction['id'].' - Not enough funds in balance');
+                    $this->log->log($transaction['id'].' - Not enough funds in balance');
                     continue;
                 }
 
@@ -293,13 +293,13 @@ class Transaction extends Model
 
         // The value must be >=0
         if ($transactionData['val'] < 0) {
-            _log($transactionData['id'].' - Value below 0');
+            $this->log->log($transactionData['id'].' - Value below 0');
             return false;
         }
 
         // The fee must be >=0
         if ($transactionData['fee'] < 0) {
-            _log($transactionData['id'].' - Fee below 0');
+            $this->log->log($transactionData['id'].' - Fee below 0');
             return false;
         }
 
@@ -315,37 +315,37 @@ class Transaction extends Model
         }
         // Added fee does not match
         if ($fee != $transactionData['fee']) {
-            _log($transactionData['id'].' - Fee not 0.25%');
+            $this->log->log($transactionData['id'].' - Fee not 0.25%');
             return false;
         }
 
         // Invalid destination address
         if (!$acc->valid($transactionData['dst'])) {
-            _log($transactionData['id'].' - Invalid destination address');
+            $this->log->log($transactionData['id'].' - Invalid destination address');
             return false;
         }
 
         // Reward transactions are not added via this function
         if ($transactionData['version'] < 1) {
-            _log($transactionData['id'].' - Invalid version <1');
+            $this->log->log($transactionData['id'].' - Invalid version <1');
             return false;
         }
 
         // Public key must be at least 15 chars / probably should be replaced with the validator function
         if (strlen($transactionData['public_key']) < 15) {
-            _log($transactionData['id'].' - Invalid public key size');
+            $this->log->log($transactionData['id'].' - Invalid public key size');
             return false;
         }
 
         // No transactions before the genesis
         if ($transactionData['date'] < 1511725068) {
-            _log($transactionData['id'].' - Date before genesis');
+            $this->log->log($transactionData['id'].' - Date before genesis');
             return false;
         }
 
         // No future transactions
         if ($transactionData['date'] > time() + 86400) {
-            _log($transactionData['id'].' - Date in the future');
+            $this->log->log($transactionData['id'].' - Date in the future');
             return false;
         }
 
@@ -365,14 +365,14 @@ class Transaction extends Model
                     && (strlen($xs) !== 62 || substr($transactionId, 2) !== $transactionData['id']))
                 || $height > 16900
             ) {
-                _log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
+                $this->log->log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
                 return false;
             }
         }
 
         // Verify the ECDSA signature
         if (!$acc->checkSignature($transactionInfo, $transactionData['signature'], $transactionData['public_key'])) {
-            _log($transactionData['id'].' - Invalid signature');
+            $this->log->log($transactionData['id'].' - Invalid signature');
             return false;
         }
 

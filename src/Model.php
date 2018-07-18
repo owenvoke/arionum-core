@@ -2,15 +2,17 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Log;
 use Arionum\Arionum\Traits\HasConfig;
 use Arionum\Arionum\Traits\HasDatabase;
+use Arionum\Arionum\Traits\HasLogging;
 
 /**
  * Class Model
  */
 class Model
 {
-    use HasConfig, HasDatabase;
+    use HasConfig, HasDatabase, HasLogging;
 
     /**
      * Model constructor.
@@ -21,5 +23,8 @@ class Model
     {
         $this->setConfig($config);
         $this->setDatabase($database);
+
+        $logger = new Log($this->config);
+        $this->setLogger($logger);
     }
 }
