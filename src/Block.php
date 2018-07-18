@@ -34,10 +34,10 @@ class Block extends Model
         string $rewardSignature,
         string $argon
     ): bool {
-        $acc = new Account($this->config, $this->database);
-        $trx = new Transaction($this->config, $this->database);
+        $account = new Account($this->config, $this->database);
+        $transactionData = new Transaction($this->config, $this->database);
 
-        $generator = $acc->getAddress($publicKey);
+        $generator = $account->getAddress($publicKey);
 
         // The transactions are always sorted in the same way, on all nodes, as they are hashed as json
         ksort($data);
@@ -54,7 +54,7 @@ class Block extends Model
 
         // Create the block data and check it against the signature
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
-        if (!$acc->checkSignature($info, $signature, $publicKey)) {
+        if (!$account->checkSignature($info, $signature, $publicKey)) {
             $this->log->log('Block signature check failed');
             return false;
         }
@@ -85,13 +85,13 @@ class Block extends Model
         $transaction['signature'] = $rewardSignature;
 
         // Hash the transaction
-        $transaction['id'] = $trx->hash($transaction);
+        $transaction['id'] = $transactionData->hash($transaction);
 
         // Check the signature
         $info = $transaction['val'].'-'.$transaction['fee'].'-'.$transaction['dst'].'-'.$transaction['message'].'-'
             .$transaction['version'].'-'.$transaction['public_key'].'-'.$transaction['date'];
 
-        if (!$acc->checkSignature($info, $rewardSignature, $publicKey)) {
+        if (!$account->checkSignature($info, $rewardSignature, $publicKey)) {
             $this->log->log('Reward signature failed');
             return false;
         }
@@ -128,7 +128,7 @@ class Block extends Model
         }
 
         // Insert the reward transaction in the db
-        $trx->add($hash, $height, $transaction);
+        $transactionData->add($hash, $height, $transaction);
 
         // Parse the block's transactions and insert them to database
         $res = $this->parseBlock($hash, $height, $data, false);
@@ -301,10 +301,10 @@ class Block extends Model
             $this->log->log("Invalid block argon - $data[argon]");
             return false;
         }
-        $acc = new Account($this->config, $this->database);
+        $account = new Account($this->config, $this->database);
 
         // Generators public key must be valid
-        if (!$acc->validKey($data['public_key'])) {
+        if (!$account->validKey($data['public_key'])) {
             $this->log->log("Invalid public key - $data[public_key]");
             return false;
         }
@@ -351,12 +351,12 @@ class Block extends Model
         }
 
         // Get the Mempool transactions
-        $txn = new Transaction($this->config, $this->database);
-        $data = $txn->mempool($this->maxTransactions());
+        $transaction = new Transaction($this->config, $this->database);
+        $data = $transaction->mempool($this->maxTransactions());
 
         $difficulty = $this->difficulty();
-        $acc = new Account($this->config, $this->database);
-        $generator = $acc->getAddress($publicKey);
+        $account = new Account($this->config, $this->database);
+        $generator = $account->getAddress($publicKey);
 
         // Always sort the transactions in the same way
         ksort($data);
@@ -367,7 +367,7 @@ class Block extends Model
         // Reward transaction and signature
         $reward = $this->reward($height, $data);
         $msg = '';
-        $transaction = [
+        $transactionData = [
             'src'        => $generator,
             'dst'        => $generator,
             'val'        => $reward,
@@ -378,8 +378,8 @@ class Block extends Model
             'public_key' => $publicKey,
         ];
 
-        ksort($transaction);
-        $rewardSignature = $txn->sign($transaction, $privateKey);
+        ksort($transactionData);
+        $rewardSignature = $transaction->sign($transactionData, $privateKey);
 
         // Add the block to the blockchain
         $result = $this->add(
@@ -456,8 +456,7 @@ class Block extends Model
         $hash = $base.$argon;
 
         // Hash the base 6 times
-        for ($i = 0; $i < 5;
-             $i++) {
+        for ($i = 0; $i < 5; $i++) {
             $hash = hash('sha512', $hash, true);
         }
 
@@ -497,7 +496,7 @@ class Block extends Model
     public function parseBlock(string $block, int $height, array $data, bool $test = true): bool
     {
         // Data must be an array
-        if ($data === false) {
+        if (!$data) {
             return false;
         }
 
@@ -505,54 +504,56 @@ class Block extends Model
         $transaction = new Transaction($this->config, $this->database);
 
         // No transactions means all are valid
-        if (count($data) == 0) {
+        if (count($data) === 0) {
             return true;
         }
 
         // Check if the number of transactions is not bigger than current block size
-        $max = $this->maxTransactions();
-        if (count($data) > $max) {
+        if (count($data) > $this->maxTransactions()) {
             return false;
         }
 
         $balance = [];
-        foreach ($data as &$x) {
+        foreach ($data as &$blockData) {
             // Get the sender's account if empty
-            if (empty($x['src'])) {
-                $x['src'] = $account->getAddress($x['public_key']);
+            if (empty($blockData['src'])) {
+                $blockData['src'] = $account->getAddress($blockData['public_key']);
             }
 
             // Validate the transaction
-            if (!$transaction->check($x, $height)) {
+            if (!$transaction->check($blockData, $height)) {
                 return false;
             }
 
             // Prepare total balance
-            $balance[$x['src']] += $x['val'] + $x['fee'];
+            $balance[$blockData['src']] += $blockData['val'] + $blockData['fee'];
 
             // Check if the transaction is already on the blockchain
-            if ($this->database->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $x['id']]) > 0) {
+            $transactionExists = $this->database->single(
+                'SELECT COUNT(1) FROM transactions WHERE id=:id',
+                [':id' => $blockData['id']]
+            );
+            if ($transactionExists > 0) {
                 return false;
             }
         }
 
         // Check if the account has enough balance to perform the transaction
-        foreach ($balance as $id => $bal) {
-            $res = $this->database->single(
+        foreach ($balance as $id => $accountBalance) {
+            $result = $this->database->single(
                 'SELECT COUNT(1) FROM accounts WHERE id=:id AND balance>=:balance',
-                [':id' => $id, ':balance' => $bal]
+                [':id' => $id, ':balance' => $accountBalance]
             );
 
-            if ($res == 0) {
+            if ($result == 0) {
                 return false; // not enough balance for the transactions
             }
         }
 
         // If the test argument is false, add the transactions to the blockchain
         if (!$test) {
-            foreach ($data as $d) {
-                $res = $transaction->add($block, $height, $d);
-                if ($res == false) {
+            foreach ($data as $blockData) {
+                if (!$transaction->add($block, $height, $blockData)) {
                     return false;
                 }
             }
@@ -582,7 +583,7 @@ class Block extends Model
         $date = '1515324995';
         $nonce = '4QRKTSJ+i9Gf9ubPo487eSi+eWOnIBt9w4Y+5J+qbh8=';
 
-        $res = $this->add(
+        if (!$this->add(
             $height,
             $publicKey,
             $nonce,
@@ -592,9 +593,7 @@ class Block extends Model
             $difficulty,
             $rewardSignature,
             $argon
-        );
-
-        if (!$res) {
+        )) {
             (new Helpers\Api($this->config))->error('Could not add the genesis block.');
         }
     }
@@ -623,40 +622,39 @@ class Block extends Model
             $height = 2;
         }
 
-        /** @global DB $db */
-        global $db;
-        $trx = new Transaction($this->config, $this->database);
+        $transaction = new Transaction($this->config, $this->database);
 
-        $r = $db->run('SELECT * FROM blocks WHERE height>=:height ORDER by height DESC', [":height" => $height]);
+        $blocks = $this->database->run(
+            'SELECT * FROM blocks WHERE height>=:height ORDER by height DESC',
+            [":height" => $height]
+        );
 
-        if (count($r) === 0) {
+        if (count($blocks) === 0) {
             return false;
         }
 
-        $db->beginTransaction();
-        $db->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
-        foreach ($r as $x) {
-            $res = $trx->reverse($x['id']);
-
-            if ($res === false) {
-                $db->rollback();
-                $db->exec('UNLOCK TABLES');
+        $this->database->beginTransaction();
+        $this->database->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
+        foreach ($blocks as $block) {
+            if (!$transaction->reverse($block['id'])) {
+                $this->database->rollback();
+                $this->database->exec('UNLOCK TABLES');
 
                 return false;
             }
 
-            $res = $db->run('DELETE FROM blocks WHERE id=:id', [':id' => $x['id']]);
+            $res = $this->database->run('DELETE FROM blocks WHERE id=:id', [':id' => $block['id']]);
 
             if ($res !== 1) {
-                $db->rollback();
-                $db->exec('UNLOCK TABLES');
+                $this->database->rollback();
+                $this->database->exec('UNLOCK TABLES');
 
                 return false;
             }
         }
 
-        $db->commit();
-        $db->exec('UNLOCK TABLES');
+        $this->database->commit();
+        $this->database->exec('UNLOCK TABLES');
 
         return true;
     }
@@ -669,7 +667,7 @@ class Block extends Model
      */
     public function deleteId(string $id): bool
     {
-        $trx = new Transaction($this->config, $this->database);
+        $transaction = new Transaction($this->config, $this->database);
 
         $blocks = $this->database->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
 
@@ -682,8 +680,7 @@ class Block extends Model
         $this->database->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
 
         // Reverse all transactions of the block
-        $res = $trx->reverse($blocks['id']);
-        if (!$res) {
+        if (!$transaction->reverse($blocks['id'])) {
             // Rollback if you can't reverse the transactions
             $this->database->rollback();
             $this->database->exec('UNLOCK TABLES');
@@ -691,8 +688,8 @@ class Block extends Model
         }
 
         // Remove the actual block
-        $res = $this->database->run('DELETE FROM blocks WHERE id = :id', [':id' => $blocks['id']]);
-        if ($res !== 1) {
+        $result = $this->database->run('DELETE FROM blocks WHERE id = :id', [':id' => $blocks['id']]);
+        if ($result !== 1) {
             // Rollback if you can't delete the block
             $this->database->rollback();
             $this->database->exec('UNLOCK TABLES');
@@ -787,27 +784,27 @@ class Block extends Model
             return false;
         }
 
-        $r = $this->database->run(
+        $transactionResults = $this->database->run(
             'SELECT * FROM transactions WHERE version > 0 AND block = :block',
             [":block" => $block['id']]
         );
         $transactions = [];
 
-        foreach ($r as $x) {
-            $trans = [
-                'id'         => $x['id'],
-                'dst'        => $x['dst'],
-                'val'        => $x['val'],
-                'fee'        => $x['fee'],
-                'signature'  => $x['signature'],
-                'message'    => $x['message'],
-                'version'    => $x['version'],
-                'date'       => $x['date'],
-                'public_key' => $x['public_key'],
+        foreach ($transactionResults as $transactionResult) {
+            $transaction = [
+                'id'         => $transactionResult['id'],
+                'dst'        => $transactionResult['dst'],
+                'val'        => $transactionResult['val'],
+                'fee'        => $transactionResult['fee'],
+                'signature'  => $transactionResult['signature'],
+                'message'    => $transactionResult['message'],
+                'version'    => $transactionResult['version'],
+                'date'       => $transactionResult['date'],
+                'public_key' => $transactionResult['public_key'],
             ];
 
-            ksort($trans);
-            $transactions[$x['id']] = $trans;
+            ksort($transaction);
+            $transactions[$transactionResult['id']] = $transaction;
         }
 
         ksort($transactions);
@@ -832,10 +829,6 @@ class Block extends Model
      */
     public function get(int $height)
     {
-        if (empty($height)) {
-            return false;
-        }
-        $block = $this->database->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
-        return $block;
+        return $this->database->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
     }
 }
