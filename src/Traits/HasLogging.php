@@ -9,8 +9,6 @@ use Arionum\Arionum\Helpers\Log;
  */
 trait HasLogging
 {
-    use HasConfig;
-
     /**
      * @var Log
      */
