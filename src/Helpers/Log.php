@@ -25,10 +25,10 @@ class Log
      * Log function, this only shows in the CLI.
      * @param string $logData
      * @return void
+     * @throws \Exception
      *
      * @todo Convert to Monolog
      * @link https://github.com/pxgamer/arionum/issues/3
-     * @throws \Exception
      */
     public function log(string $logData): void
     {
@@ -66,9 +66,10 @@ class Log
 
     /**
      * @param string $logInfo
+     * @return void
      * @throws \Exception
      */
-    private function logToConsole(string $logInfo)
+    private function logToConsole(string $logInfo): void
     {
         if (php_sapi_name() === 'cli') {
             echo $logInfo;
@@ -77,9 +78,10 @@ class Log
 
     /**
      * @param string $logInfo
+     * @return void
      * @throws \Exception
      */
-    private function logToFile(string $logInfo)
+    private function logToFile(string $logInfo): void
     {
         $logFile = $this->config->get('log_file');
         $logDirectory = dirname($logFile);
