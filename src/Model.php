@@ -8,16 +8,22 @@ namespace Arionum\Arionum;
 class Model
 {
     /**
+     * @var Config
+     */
+    protected $config;
+    /**
      * @var DB
      */
     protected $database;
 
     /**
      * Model constructor.
-     * @param DB $database
+     * @param Config $config
+     * @param DB     $database
      */
-    public function __construct(DB $database)
+    public function __construct(Config $config, DB $database)
     {
+        $this->config = $config;
         $this->database = $database;
     }
 }
