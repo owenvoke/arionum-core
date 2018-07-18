@@ -20,10 +20,7 @@
     "autoload": {
         "psr-4": {
             "Arionum\\Arionum\\": "src"
-        },
-        "files": [
-            "src/functions.inc.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
