@@ -167,7 +167,7 @@ class Transaction extends Model
         $current = $block->current();
 
         $height = $current['height'];
-        $transactionData['id'] = san($transactionData['id']);
+        $transactionData['id'] = Helpers\Sanitise::alphanumeric($transactionData['id']);
 
         $bind = [
             ':peer'       => $peer,
@@ -207,7 +207,7 @@ class Transaction extends Model
 
         $acc->add($transactionData['public_key'], $block);
         $acc->addId($transactionData['dst'], $block);
-        $transactionData['id'] = san($transactionData['id']);
+        $transactionData['id'] = Helpers\Sanitise::alphanumeric($transactionData['id']);
 
         $bind = [
             ':id'         => $transactionData['id'],
@@ -465,8 +465,8 @@ class Transaction extends Model
         $current = $block->current();
         $acc = new Account($this->config, $this->database);
 
-        $height = san($height);
-        $transactionId = san($transactionId);
+        $height = Helpers\Sanitise::alphanumeric($height);
+        $transactionId = Helpers\Sanitise::alphanumeric($transactionId);
 
         if (empty($transactionId) && empty($height)) {
             return false;
