@@ -28,8 +28,8 @@ class Config
      */
     public function get(string $key)
     {
-        if (property_exists($this, $key)) {
-            return $this->$key;
+        if (key_exists($key, $this->properties)) {
+            return $this->properties[$key];
         }
 
         throw new Exceptions\ConfigPropertyNotFoundException();
