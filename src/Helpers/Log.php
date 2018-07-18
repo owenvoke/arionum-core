@@ -81,7 +81,10 @@ class Log
      */
     private function logToFile(string $logInfo)
     {
-        if ($this->config->get('enable_logging') && is_writable($this->config->get('log_file'))) {
+        if ($this->config->get('enable_logging')
+            && is_dir(dirname($this->config->get('log_file')))
+            && is_writable(dirname($this->config->get('log_file')))
+        ) {
             file_put_contents($this->config->get('log_file'), $logInfo, FILE_APPEND);
         }
     }
