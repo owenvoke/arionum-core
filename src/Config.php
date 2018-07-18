@@ -24,7 +24,7 @@ class Config
     /**
      * @param string $key
      * @return mixed|null
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function get(string $key)
     {
