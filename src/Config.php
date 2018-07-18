@@ -24,10 +24,15 @@ class Config
     /**
      * @param string $key
      * @return mixed|null
+     * @throws Exceptions\ConfigPropertyNotFoundException
      */
     public function get(string $key)
     {
-        return $this->$key ?? null;
+        if (property_exists($this, $key)) {
+            return $this->$key;
+        }
+
+        throw new Exceptions\ConfigPropertyNotFoundException();
     }
 
     /**
