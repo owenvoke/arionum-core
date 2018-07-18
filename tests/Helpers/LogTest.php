@@ -18,6 +18,9 @@ class LogTest extends TestCase
     const BUILD_DIRECTORY = __DIR__.'/../../build';
     const LOG_FILE_LOCATION = self::BUILD_DIRECTORY.'/aro.log';
 
+    /**
+     * Set up the requirements for the unit tests.
+     */
     public function setUp()
     {
         if (!is_dir(self::BUILD_DIRECTORY)) {
