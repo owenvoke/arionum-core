@@ -50,8 +50,8 @@ class DB extends PDO
         $this->debugger = $debugLevel;
         try {
             parent::__construct($dsn, $user, $password, $options);
-        } catch (PDOException $e) {
-            $this->error = $e->getMessage();
+        } catch (PDOException $exception) {
+            $this->error = $exception->getMessage();
             die('Could not connect to the DB - '.$this->error);
         }
     }
@@ -64,6 +64,7 @@ class DB extends PDO
         if (!$this->debugger) {
             return;
         }
+
         $error = ['Error' => $this->error];
         if (!empty($this->sql)) {
             $error['SQL Statement'] = $this->sql;
@@ -81,9 +82,9 @@ class DB extends PDO
             }
         }
         $msg = '';
-        $msg .= "SQL Error\n".str_repeat('-', 50);
-        foreach ($error as $key => $val) {
-            $msg .= "\n\n$key:\n$val";
+        $msg .= 'SQL Error'.PHP_EOL.str_repeat('-', 50);
+        foreach ($error as $key => $value) {
+            $msg .= PHP_EOL.PHP_EOL.$key.':'.PHP_EOL.$value;
         }
 
         if ($this->debugger) {
@@ -126,12 +127,12 @@ class DB extends PDO
         $this->error = '';
 
         try {
-            $pdoStatement = $this->prepare($this->sql);
-            if ($pdoStatement->execute($this->bind) !== false) {
-                return $pdoStatement->fetchColumn();
+            $statement = $this->prepare($this->sql);
+            if ($statement->execute($this->bind) !== false) {
+                return $statement->fetchColumn();
             }
-        } catch (PDOException $e) {
-            $this->error = $e->getMessage();
+        } catch (PDOException $exception) {
+            $this->error = $exception->getMessage();
             $this->debug();
         }
 
@@ -151,16 +152,16 @@ class DB extends PDO
         $this->error = '';
 
         try {
-            $pdoStatement = $this->prepare($this->sql);
-            if ($pdoStatement->execute($this->bind) !== false) {
+            $statement = $this->prepare($this->sql);
+            if ($statement->execute($this->bind) !== false) {
                 if (preg_match('/^('.implode('|', ['select', 'describe', 'pragma']).') /i', $this->sql)) {
-                    return $pdoStatement->fetchAll(PDO::FETCH_ASSOC);
+                    return $statement->fetchAll(PDO::FETCH_ASSOC);
                 } elseif (preg_match('/^('.implode('|', ['delete', 'insert', 'update']).') /i', $this->sql)) {
-                    return $pdoStatement->rowCount();
+                    return $statement->rowCount();
                 }
             }
-        } catch (PDOException $e) {
-            $this->error = $e->getMessage();
+        } catch (PDOException $exception) {
+            $this->error = $exception->getMessage();
             $this->debug();
         }
 
