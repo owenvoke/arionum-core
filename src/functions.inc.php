@@ -1,71 +1,6 @@
 <?php
 
-use Arionum\Arionum\Config;
-
-/**
- * Sanitise data to only allow alphanumeric characters.
- * @param string $input
- * @param string $additionalCharacters
- * @return string
- */
-function san(string $input, string $additionalCharacters = ''): string
-{
-    return preg_replace('/[^a-zA-Z0-9'.$additionalCharacters.']/', '', $input);
-}
-
-/**
- * @param string $ipAddress
- * @return string
- */
-function sanIp($ipAddress): string
-{
-    return preg_replace('/[^a-fA-F0-9\\[\\]\\.\\:]/', '', $ipAddress);
-}
-
-/**
- * @param $hostAddress
- * @return string
- */
-function sanHost(string $hostAddress): string
-{
-    return preg_replace('/[^a-zA-Z0-9\\.\\-\\:\\/]/', '', $hostAddress);
-}
-
-/**
- * Output an API error and exit.
- * @param mixed  $data
- * @param Config $config
- * @return void
- * @throws \Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException
- */
-function apiErr($data, Config $config): void
-{
-    exit(json_encode(
-        [
-            'status' => 'error',
-            'data'   => $data,
-            'coin'   => $config->get('coin'),
-        ]
-    ));
-}
-
-/**
- * Output an API 'ok' response and exit.
- * @param mixed  $data
- * @param Config $config
- * @return void
- * @throws \Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException
- */
-function apiEcho($data, Config $config): void
-{
-    exit(json_encode(
-        [
-            'status' => 'ok',
-            'data'   => $data,
-            'coin'   => $config->get('coin'),
-        ]
-    ));
-}
+use StephenHill\Base58;
 
 /**
  * Log function, this only shows in the CLI.
@@ -140,124 +75,11 @@ function hexToPem(string $data, bool $isPrivateKey = false): string
     return "-----BEGIN PUBLIC KEY-----\n".$data."\n-----END PUBLIC KEY-----";
 }
 
-
-/**
- * Encode a string to Base58.
- * @param string $string
- * @return bool|string
- * @author Stephen Hill
- * @link   https://github.com/stephen-hill/base58php
- */
-function base58Encode(string $string)
-{
-    $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    $base = strlen($alphabet);
-
-    // Type validation
-    if (is_string($string) === false) {
-        return false;
-    }
-
-    // If the string is empty, then the encoded string is obviously empty
-    if (strlen($string) === 0) {
-        return '';
-    }
-
-    // Convert the byte array into an arbitrary-precision decimal.
-    // Do this by performing a base256 to base10 conversion.
-    $hex = unpack('H*', $string);
-    $hex = reset($hex);
-    $decimal = gmp_init($hex, 16);
-
-    // This loop now performs base 10 to base 58 conversion
-    // The remainder or modulo on each loop becomes a base 58 character
-    $output = '';
-    while (gmp_cmp($decimal, $base) >= 0) {
-        list($decimal, $mod) = gmp_div_qr($decimal, $base);
-        $output .= $alphabet[gmp_intval($mod)];
-    }
-
-    // If there's still a remainder, append it
-    if (gmp_cmp($decimal, 0) > 0) {
-        $output .= $alphabet[gmp_intval($decimal)];
-    }
-
-    // Reverse the encoded data
-    $output = strrev($output);
-
-    // Add leading zeros
-    $bytes = str_split($string);
-    foreach ($bytes as $byte) {
-        if ($byte === "\x00") {
-            $output = $alphabet[0].$output;
-            continue;
-        }
-        break;
-    }
-    return (string)$output;
-}
-
-/**
- * Decode a Base58 string.
- * @param string $base58
- * @return bool|string
- * @author Stephen Hill
- * @link   https://github.com/stephen-hill/base58php
- */
-function base58Decode(string $base58)
-{
-    $alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    $base = strlen($alphabet);
-
-    // Type Validation
-    if (is_string($base58) === false) {
-        return false;
-    }
-
-    // If the string is empty, then the decoded string is obviously empty
-    if (strlen($base58) === 0) {
-        return '';
-    }
-    $indexes = array_flip(str_split($alphabet));
-    $chars = str_split($base58);
-
-    // Check for invalid characters in the supplied base58 string
-    foreach ($chars as $char) {
-        if (isset($indexes[$char]) === false) {
-            return false;
-        }
-    }
-
-    // Convert from base58 to base10
-    $decimal = gmp_init($indexes[$chars[0]], 10);
-    for ($i = 1, $l = count($chars); $i < $l; $i++) {
-        $decimal = gmp_mul($decimal, $base);
-        $decimal = gmp_add($decimal, $indexes[$chars[$i]]);
-    }
-
-    // Convert from base10 to base256 (8-bit byte array)
-    $output = '';
-    while (gmp_cmp($decimal, 0) > 0) {
-        list($decimal, $byte) = gmp_div_qr($decimal, 256);
-        $output = pack('C', gmp_intval($byte)).$output;
-    }
-
-    // Now we need to add leading zeros
-    foreach ($chars as $char) {
-        if ($indexes[$char] === 0) {
-            $output = "\x00".$output;
-            continue;
-        }
-        break;
-    }
-
-    return $output;
-}
-
 /**
  * Convert a PEM key to the Base58 version used by Arionum.
  * @param string $data
  * @return string
+ * @throws Exception
  */
 function pemToCoin(string $data): string
 {
@@ -268,7 +90,7 @@ function pemToCoin(string $data): string
     $data = str_replace("\n", "", $data);
     $data = base64_decode($data);
 
-    return base58Encode($data);
+    return (new Base58())->encode($data);
 }
 
 /**
@@ -276,10 +98,11 @@ function pemToCoin(string $data): string
  * @param string $data
  * @param bool   $isPrivateKey
  * @return string
+ * @throws Exception
  */
 function coinToPem(string $data, $isPrivateKey = false)
 {
-    $data = base58Decode($data);
+    $data = (new Base58())->decode($data);
     $data = base64_encode($data);
 
     $dat = str_split($data, 64);
@@ -296,6 +119,7 @@ function coinToPem(string $data, $isPrivateKey = false)
  * @param string $data
  * @param string $key
  * @return bool|string
+ * @throws Exception
  */
 function ecSign($data, string $key)
 {
@@ -307,7 +131,7 @@ function ecSign($data, string $key)
     openssl_sign($data, $signature, $pKey, OPENSSL_ALGO_SHA256);
 
     // The signature will be base58 encoded
-    return base58Encode($signature);
+    return (new Base58())->encode($signature);
 }
 
 /**
@@ -316,13 +140,14 @@ function ecSign($data, string $key)
  * @param string $signature
  * @param string $key
  * @return bool
+ * @throws Exception
  */
 function ecVerify(string $data, string $signature, string $key)
 {
     // Transform the Base58 key to PEM
     $publicKey = coinToPem($key);
 
-    $signature = base58Decode($signature);
+    $signature = (new Base58())->decode($signature);
 
     $pKey = openssl_pkey_get_public($publicKey);
 
@@ -336,75 +161,25 @@ function ecVerify(string $data, string $signature, string $key)
 }
 
 /**
- * Post data to a URL endpoint (usually a peer).
- * The data is an array that is JSON encoded and sent as a data parameter.
- * @param string $url
- * @param array  $data
- * @param int    $timeout
- * @param bool   $debug
- * @return bool
- */
-function peerPost(string $url, array $data = [], int $timeout = 60, bool $debug = false): bool
-{
-    /** @global array $_config */
-    global $_config;
-    if ($debug) {
-        echo "\nPeer post: $url\n";
-    }
-
-    $postData = http_build_query(
-        [
-            'data' => json_encode($data),
-            "coin" => $_config['coin'],
-        ]
-    );
-
-    $options = [
-        'http' =>
-            [
-                'timeout' => $timeout,
-                'method'  => 'POST',
-                'header'  => 'Content-type: application/x-www-form-urlencoded',
-                'content' => $postData,
-            ],
-    ];
-
-    $context = stream_context_create($options);
-
-    $peerResponse = file_get_contents($url, false, $context);
-
-    if ($debug) {
-        echo "\nPeer response: $peerResponse\n";
-    }
-
-    $result = json_decode($peerResponse, true);
-
-    // The function will return false if something goes wrong
-    if ($result['status'] !== 'ok' || $result['coin'] !== $_config['coin']) {
-        return false;
-    }
-
-    return $result['data'];
-}
-
-/**
  * Convert hexadecimal data to Base58.
  * @param string $hexadecimalData
  * @return string
+ * @throws Exception
  */
 function hexToCoin(string $hexadecimalData): string
 {
     $data = hex2bin($hexadecimalData);
-    return base58Encode($data);
+    return (new Base58())->encode($data);
 }
 
 /**
  * Convert Base58 data to hexadecimal.
  * @param string $data
  * @return string
+ * @throws Exception
  */
 function coinToHex(string $data): string
 {
-    $bin = base58Decode($data);
+    $bin = (new Base58())->decode($data);
     return bin2hex($bin);
 }

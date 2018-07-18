@@ -2,6 +2,8 @@
 
 namespace Arionum\Arionum;
 
+use StephenHill\Base58;
+
 /**
  * Class Transaction
  */
@@ -11,7 +13,7 @@ class Transaction extends Model
      * Reverse and remove all transactions from a block.
      * @param string $block
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function reverse(string $block): bool
     {
@@ -53,7 +55,7 @@ class Transaction extends Model
     /**
      * Clear the Mempool.
      * @return void
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function cleanMempool(): void
     {
@@ -70,7 +72,7 @@ class Transaction extends Model
      * Get 'x' transactions from Mempool.
      * @param int $max
      * @return array
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function mempool(int $max): array
     {
@@ -159,7 +161,7 @@ class Transaction extends Model
      * @param array  $transactionData
      * @param string $peer
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
@@ -200,6 +202,7 @@ class Transaction extends Model
      * @param int    $height
      * @param array  $transactionData
      * @return bool
+     * @throws \Exception
      */
     public function add(string $block, int $height, array $transactionData): bool
     {
@@ -256,6 +259,7 @@ class Transaction extends Model
      * Hash the transaction's most important fields and create the transaction ID.
      * @param array $transactionData
      * @return string
+     * @throws \Exception
      */
     public function hash(array $transactionData): string
     {
@@ -271,7 +275,7 @@ class Transaction extends Model
      * @param array $transactionData
      * @param int   $height
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function check(array $transactionData, int $height = 0): bool
     {
@@ -356,7 +360,7 @@ class Transaction extends Model
         if ($transactionData['id'] !== $transactionId) {
             // Fix for broken Base58 library which was used until block 16900.
             // Accept hashes without the first 1 or 2 bytes.
-            $xs = base58Decode($transactionData['id']);
+            $xs = (new Base58())->decode($transactionData['id']);
             if (((strlen($xs) !== 63 || substr($transactionId, 1) !== $transactionData['id'])
                     && (strlen($xs) !== 62 || substr($transactionId, 2) !== $transactionData['id']))
                 || $height > 16900
@@ -380,6 +384,7 @@ class Transaction extends Model
      * @param array  $transactionData
      * @param string $privateKey
      * @return string
+     * @throws \Exception
      */
     public function sign(array $transactionData, string $privateKey): string
     {
@@ -405,7 +410,7 @@ class Transaction extends Model
      * Get the transaction data as array.
      * @param string $transactionId
      * @return array|bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function getTransaction(string $transactionId)
     {
@@ -457,7 +462,7 @@ class Transaction extends Model
      * @param string $height
      * @param string $transactionId
      * @return array|bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function getTransactions($height = '', $transactionId = '')
     {

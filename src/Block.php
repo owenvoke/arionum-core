@@ -19,7 +19,7 @@ class Block extends Model
      * @param string $rewardSignature
      * @param string $argon
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function add(
         int $height,
@@ -143,7 +143,7 @@ class Block extends Model
     /**
      * Get the current block, without the transactions.
      * @return array
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function current()
     {
@@ -171,7 +171,7 @@ class Block extends Model
      * The higher the difficulty number, the easier it is to win a block.
      * @param int $height
      * @return bool|int|mixed|string
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function difficulty(int $height = 0)
     {
@@ -237,7 +237,7 @@ class Block extends Model
      * Calculate the maximum block size.
      * Increase by 10% the number of transactions if >100 on the last 100 blocks.
      * @return float|int
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function maxTransactions()
     {
@@ -290,7 +290,7 @@ class Block extends Model
      * Check the validity of a block.
      * @param array $data
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function check(array $data): bool
     {
@@ -329,7 +329,7 @@ class Block extends Model
      * @param string $publicKey
      * @param string $privateKey
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function forge(string $nonce, string $argon, string $publicKey, string $privateKey): bool
     {
@@ -409,7 +409,7 @@ class Block extends Model
      * @param int    $currentId
      * @param int    $currentHeight
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function mine(
         string $publicKey,
@@ -490,7 +490,7 @@ class Block extends Model
      * @param array  $data
      * @param bool   $test
      * @return bool
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function parseBlock(string $block, int $height, array $data, bool $test = true): bool
     {
@@ -562,7 +562,7 @@ class Block extends Model
     /**
      * Initialise the blockchain and add the genesis block.
      * @return void
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     private function genesis(): void
     {
@@ -593,7 +593,7 @@ class Block extends Model
         );
 
         if (!$res) {
-            apiErr('Could not add the genesis block.', $this->config);
+            (new Helpers\Api($this->config))->error('Could not add the genesis block.');
         }
     }
 
@@ -601,7 +601,7 @@ class Block extends Model
      * Remove the last 'x' number of blocks.
      * @param int $blocksToRemove
      * @return void
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function pop($blocksToRemove = 1): void
     {
@@ -613,6 +613,7 @@ class Block extends Model
      * Delete all blocks greater than or equal to the specified height.
      * @param int $height
      * @return bool
+     * @throws \Exception
      */
     public function delete(int $height): bool
     {
@@ -662,6 +663,7 @@ class Block extends Model
      * Delete a block by its id.
      * @param string $id
      * @return bool
+     * @throws \Exception
      */
     public function deleteId(string $id): bool
     {
@@ -714,6 +716,7 @@ class Block extends Model
      * @param int    $difficulty
      * @param string $argon
      * @return string
+     * @throws \Exception
      */
     public function sign(
         string $generator,
@@ -743,6 +746,7 @@ class Block extends Model
      * @param int    $difficulty
      * @param string $argon
      * @return string
+     * @throws \Exception
      */
     public function hash(
         string $publicKey,

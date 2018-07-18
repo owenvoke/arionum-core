@@ -2,6 +2,8 @@
 
 namespace Arionum\Arionum;
 
+use StephenHill\Base58;
+
 /**
  * Class Account
  */
@@ -12,6 +14,7 @@ class Account extends Model
      * @param string $publicKey
      * @param string $block
      * @return void
+     * @throws \Exception
      */
     public function add(string $publicKey, string $block): void
     {
@@ -56,6 +59,7 @@ class Account extends Model
      * Generate the account's address from the public key.
      * @param string $publicKey
      * @return string
+     * @throws \Exception
      */
     public function getAddress(string $publicKey): string
     {
@@ -69,7 +73,7 @@ class Account extends Model
             $publicKey = hash('sha512', $publicKey, true);
         }
 
-        return base58Encode($publicKey);
+        return (new Base58())->encode($publicKey);
     }
 
     /**
@@ -78,6 +82,7 @@ class Account extends Model
      * @param string $signature
      * @param string $publicKey
      * @return bool
+     * @throws \Exception
      */
     public function checkSignature(string $data, string $signature, string $publicKey): bool
     {
@@ -87,6 +92,7 @@ class Account extends Model
     /**
      * Generate a new account and a public/private key pair.
      * @return array
+     * @throws \Exception
      */
     public function generateAccount(): array
     {
@@ -208,7 +214,7 @@ class Account extends Model
      * @param string $address
      * @param int    $limit
      * @return array
-     * @throws Exceptions\ConfigPropertyNotFoundException
+     * @throws \Exception
      */
     public function getTransactions(string $address, int $limit = 100): array
     {
