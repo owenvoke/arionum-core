@@ -48,17 +48,17 @@ class Log
     {
         $date = date('[Y-m-d H:i:s]');
         $trace = debug_backtrace();
-        $lineNumber = count($trace) - 1;
-        $file = substr($trace[$lineNumber]['file'], strrpos($trace[$lineNumber]['file'], '/') + 1);
+        $traceData = $trace[count($trace) - 1];
+        $file = substr($traceData['file'], strrpos($traceData['file'], '/') + 1);
 
-        $logInfo = $date.' '.$file.':'.$trace[$lineNumber]['line'];
+        $logInfo = $date.' '.$file.':'.$traceData['line'];
 
-        if (!empty($trace[$lineNumber]['class'])) {
-            $logInfo .= '---'.$trace[$lineNumber]['class'];
+        if (!empty($traceData['class'])) {
+            $logInfo .= '---'.$traceData['class'];
         }
 
-        if (!empty($trace[$lineNumber]['function']) && $trace[$lineNumber]['function'] != '_log') {
-            $logInfo .= '->'.$trace[$lineNumber]['function'].'()';
+        if (!empty($traceData['function']) && $traceData['function'] != '_log') {
+            $logInfo .= '->'.$traceData['function'].'()';
         }
 
         return $logInfo.' '.$logData.' '.PHP_EOL;
