@@ -42,7 +42,7 @@ class Config
      */
     public function set(string $key, $value)
     {
-        $this->$key = $value;
+        $this->properties[$key] = $value;
 
         return $this;
     }
