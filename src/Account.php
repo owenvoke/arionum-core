@@ -2,21 +2,23 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
+use StephenHill\Base58;
+
 /**
  * Class Account
  */
-class Account
+class Account extends Model
 {
     /**
      * Insert the account into the database and update the public key if empty.
      * @param string $publicKey
      * @param string $block
      * @return void
+     * @throws \Exception
      */
     public function add(string $publicKey, string $block): void
     {
-        /** @global DB $db */
-        global $db;
         $id = $this->getAddress($publicKey);
         $bind = [
             ':id'          => $id,
@@ -25,7 +27,7 @@ class Account
             ':public_key2' => $publicKey,
         ];
 
-        $db->run(
+        $this->database->run(
             "INSERT INTO accounts
              SET id=:id, public_key=:public_key, block=:block, balance=0
              ON DUPLICATE KEY
@@ -42,14 +44,12 @@ class Account
      */
     public function addId(string $id, string $block): void
     {
-        /** @global DB $db */
-        global $db;
         $bind = [
             ':id'    => $id,
             ':block' => $block,
         ];
 
-        $db->run(
+        $this->database->run(
             "INSERT ignore INTO accounts
              SET id = :id, public_key = '', block = :block, balance = 0",
             $bind
@@ -60,6 +60,7 @@ class Account
      * Generate the account's address from the public key.
      * @param string $publicKey
      * @return string
+     * @throws \Exception
      */
     public function getAddress(string $publicKey): string
     {
@@ -73,7 +74,7 @@ class Account
             $publicKey = hash('sha512', $publicKey, true);
         }
 
-        return base58Encode($publicKey);
+        return (new Base58())->encode($publicKey);
     }
 
     /**
@@ -82,15 +83,17 @@ class Account
      * @param string $signature
      * @param string $publicKey
      * @return bool
+     * @throws \Exception
      */
     public function checkSignature(string $data, string $signature, string $publicKey): bool
     {
-        return ecVerify($data, $signature, $publicKey);
+        return Keys::ecVerify($data, $signature, $publicKey);
     }
 
     /**
      * Generate a new account and a public/private key pair.
      * @return array
+     * @throws \Exception
      */
     public function generateAccount(): array
     {
@@ -107,13 +110,13 @@ class Account
         openssl_pkey_export($sslPrivateKey, $pemKey);
 
         // Convert the PEM to a Base58 format
-        $privateKey = pemToCoin($pemKey);
+        $privateKey = Keys::pemToCoin($pemKey);
 
         // Export the private key encoded as PEM
         $sslPublicKey = openssl_pkey_get_details($sslPrivateKey);
 
         // Convert the PEM to a Base58 format
-        $publicKey = pemToCoin($sslPublicKey['key']);
+        $publicKey = Keys::pemToCoin($sslPublicKey['key']);
 
         // Generate the account's address based on the public key
         $address = $this->getAddress($publicKey);
@@ -172,9 +175,7 @@ class Account
      */
     public function balance(string $address): string
     {
-        /** @global DB $db */
-        global $db;
-        $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
+        $balance = $this->database->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
 
         if ($balance === false) {
             $balance = '0.00000000';
@@ -190,9 +191,7 @@ class Account
      */
     public function pendingBalance(string $address): string
     {
-        /** @global DB $db */
-        global $db;
-        $balance = $db->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
+        $balance = $this->database->single('SELECT balance FROM accounts WHERE id = :id', [':id' => $address]);
         if ($balance === false) {
             $balance = '0.00000000';
         }
@@ -202,7 +201,10 @@ class Account
             return $balance;
         }
 
-        $mempoolAmount = $db->single('SELECT SUM(val+fee) FROM mempool WHERE src = :id', [':id' => $address]);
+        $mempoolAmount = $this->database->single(
+            'SELECT SUM(val+fee) FROM mempool WHERE src = :id',
+            [':id' => $address]
+        );
         $balanceWithoutPending = $balance - $mempoolAmount;
 
         return number_format($balanceWithoutPending, 8, '.', '');
@@ -213,12 +215,11 @@ class Account
      * @param string $address
      * @param int    $limit
      * @return array
+     * @throws \Exception
      */
     public function getTransactions(string $address, int $limit = 100): array
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
         $publicKey = $this->publicKey($address);
         $limit = intval($limit);
@@ -227,7 +228,7 @@ class Account
             $limit = 100;
         }
 
-        $result = $db->run(
+        $result = $this->database->run(
             'SELECT * FROM transactions WHERE dst=:dst or public_key=:src ORDER by height DESC LIMIT :limit',
             [':src' => $publicKey, ':dst' => $address, ':limit' => $limit]
         );
@@ -277,10 +278,8 @@ class Account
      */
     public function getMempoolTransactions(string $address): array
     {
-        /** @global DB $db */
-        global $db;
         $transactions = [];
-        $result = $db->run(
+        $result = $this->database->run(
             'SELECT * FROM mempool WHERE src = :src ORDER by height DESC LIMIT 100',
             [':src' => $address, ':dst' => $address]
         );
@@ -319,9 +318,7 @@ class Account
      */
     public function publicKey(string $address): string
     {
-        /** @global DB $db */
-        global $db;
-        return $db->single('SELECT public_key FROM accounts WHERE id = :id', [':id' => $address]);
+        return $this->database->single('SELECT public_key FROM accounts WHERE id = :id', [':id' => $address]);
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
+
 /**
  * Class Block
  */
-class Block
+class Block extends Model
 {
     /**
      * Add a new block to the blockchain.
@@ -19,6 +21,7 @@ class Block
      * @param string $rewardSignature
      * @param string $argon
      * @return bool
+     * @throws \Exception
      */
     public function add(
         int $height,
@@ -31,10 +34,8 @@ class Block
         string $rewardSignature,
         string $argon
     ): bool {
-        /** @global DB $db */
-        global $db;
-        $acc = new Account();
-        $trx = new Transaction();
+        $acc = new Account($this->config, $this->database);
+        $trx = new Transaction($this->config, $this->database);
 
         $generator = $acc->getAddress($publicKey);
 
@@ -54,17 +55,17 @@ class Block
         // Create the block data and check it against the signature
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
         if (!$acc->checkSignature($info, $signature, $publicKey)) {
-            _log('Block signature check failed');
+            $this->log->log('Block signature check failed');
             return false;
         }
 
         if (!$this->parseBlock($hash, $height, $data, true)) {
-            _log('Parse block failed');
+            $this->log->log('Parse block failed');
             return false;
         }
 
         // Lock table to avoid race conditions on blocks
-        $db->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
+        $this->database->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
 
         $reward = $this->reward($height, $data);
 
@@ -91,12 +92,12 @@ class Block
             .$transaction['version'].'-'.$transaction['public_key'].'-'.$transaction['date'];
 
         if (!$acc->checkSignature($info, $rewardSignature, $publicKey)) {
-            _log('Reward signature failed');
+            $this->log->log('Reward signature failed');
             return false;
         }
 
         // Insert the block into the database
-        $db->beginTransaction();
+        $this->database->beginTransaction();
         $total = count($data);
         $bind = [
             ':id'           => $hash,
@@ -110,7 +111,7 @@ class Block
             ':transactions' => $total,
         ];
 
-        $res = $db->run(
+        $res = $this->database->run(
             'INSERT into blocks
              SET id = :id, generator = :generator, height = :height,`date` = :date, nonce = :nonce,
              signature = :signature, difficulty = :difficulty, argon = :argon, transactions = :transactions',
@@ -119,9 +120,9 @@ class Block
 
         if ($res !== 1) {
             // Rollback and exit if it fails
-            _log('Block DB insert failed');
-            $db->rollback();
-            $db->exec('UNLOCK TABLES');
+            $this->log->log('Block DB insert failed');
+            $this->database->rollback();
+            $this->database->exec('UNLOCK TABLES');
 
             return false;
         }
@@ -133,14 +134,10 @@ class Block
         $res = $this->parseBlock($hash, $height, $data, false);
 
         // If any fails, rollback
-        if ($res == false) {
-            $db->rollback();
-        } else {
-            $db->commit();
-        }
+        (!$res) ? $this->database->rollback() : $this->database->commit();
 
         // Release the locking as everything is finished
-        $db->exec('UNLOCK TABLES');
+        $this->database->exec('UNLOCK TABLES');
 
         return true;
     }
@@ -148,12 +145,11 @@ class Block
     /**
      * Get the current block, without the transactions.
      * @return array
+     * @throws \Exception
      */
     public function current()
     {
-        /** @global DB $db */
-        global $db;
-        $current = $db->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1');
+        $current = $this->database->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1');
 
         if (!$current) {
             $this->genesis();
@@ -169,9 +165,7 @@ class Block
      */
     public function prev()
     {
-        /** @global DB $db */
-        global $db;
-        return $db->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1,1');
+        return $this->database->row('SELECT * FROM blocks ORDER by height DESC LIMIT 1,1');
     }
 
     /**
@@ -179,12 +173,10 @@ class Block
      * The higher the difficulty number, the easier it is to win a block.
      * @param int $height
      * @return bool|int|mixed|string
+     * @throws \Exception
      */
     public function difficulty(int $height = 0)
     {
-        /** @global DB $db */
-        global $db;
-
         // If no block height is specified, use the current block.
         $current = ($height === 0) ? $this->current() : $this->get($height);
 
@@ -207,7 +199,7 @@ class Block
         }
 
         // Elapsed time between the last 20 blocks
-        $first = $db->row('SELECT `date` FROM blocks ORDER by height DESC LIMIT $limit,1');
+        $first = $this->database->row('SELECT `date` FROM blocks ORDER by height DESC LIMIT $limit,1');
         $time = $current['date'] - $first['date'];
 
         // Average block time
@@ -247,21 +239,23 @@ class Block
      * Calculate the maximum block size.
      * Increase by 10% the number of transactions if >100 on the last 100 blocks.
      * @return float|int
+     * @throws \Exception
      */
     public function maxTransactions()
     {
-        /** @global DB $db */
-        global $db;
         $current = $this->current();
         $limit = $current['height'] - 100;
 
-        $avg = $db->single('SELECT AVG(transactions) FROM blocks WHERE height > :limit', [':limit' => $limit]);
+        $average = $this->database->single(
+            'SELECT AVG(transactions) FROM blocks WHERE height > :limit',
+            [':limit' => $limit]
+        );
 
-        if ($avg < 100) {
+        if ($average < 100) {
             return 100;
         }
 
-        return ceil($avg * 1.1);
+        return ceil($average * 1.1);
     }
 
     /**
@@ -298,31 +292,32 @@ class Block
      * Check the validity of a block.
      * @param array $data
      * @return bool
+     * @throws \Exception
      */
     public function check(array $data): bool
     {
         // Argon must have at least 20 chars
         if (strlen($data['argon']) < 20) {
-            _log("Invalid block argon - $data[argon]");
+            $this->log->log("Invalid block argon - $data[argon]");
             return false;
         }
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
 
         // Generators public key must be valid
         if (!$acc->validKey($data['public_key'])) {
-            _log("Invalid public key - $data[public_key]");
+            $this->log->log("Invalid public key - $data[public_key]");
             return false;
         }
 
         // Difficulty should be the same as our calculation
         if ($data['difficulty'] != $this->difficulty()) {
-            _log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
+            $this->log->log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
             return false;
         }
 
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($data['public_key'], $data['nonce'], $data['argon'])) {
-            _log('Mine check failed');
+            $this->log->log('Mine check failed');
             return false;
         }
 
@@ -336,12 +331,13 @@ class Block
      * @param string $publicKey
      * @param string $privateKey
      * @return bool
+     * @throws \Exception
      */
     public function forge(string $nonce, string $argon, string $publicKey, string $privateKey): bool
     {
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($publicKey, $nonce, $argon)) {
-            _log('Forge failed - Invalid argon');
+            $this->log->log('Forge failed - Invalid argon');
             return false;
         }
 
@@ -350,16 +346,16 @@ class Block
         $height = $current['height'] += 1;
         $date = time();
         if ($date <= $current['date']) {
-            _log('Forge failed - Date older than last block');
+            $this->log->log('Forge failed - Date older than last block');
             return false;
         }
 
         // Get the Mempool transactions
-        $txn = new Transaction();
+        $txn = new Transaction($this->config, $this->database);
         $data = $txn->mempool($this->maxTransactions());
 
         $difficulty = $this->difficulty();
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
         $generator = $acc->getAddress($publicKey);
 
         // Always sort the transactions in the same way
@@ -386,7 +382,7 @@ class Block
         $rewardSignature = $txn->sign($transaction, $privateKey);
 
         // Add the block to the blockchain
-        $res = $this->add(
+        $result = $this->add(
             $height,
             $publicKey,
             $nonce,
@@ -398,8 +394,8 @@ class Block
             $argon
         );
 
-        if (!$res) {
-            _log("Forge failed - Block->Add() failed");
+        if (!$result) {
+            $this->log->log('Forge failed - Block->Add() failed');
             return false;
         }
 
@@ -415,6 +411,7 @@ class Block
      * @param int    $currentId
      * @param int    $currentHeight
      * @return bool
+     * @throws \Exception
      */
     public function mine(
         string $publicKey,
@@ -424,9 +421,6 @@ class Block
         int $currentId = 0,
         int $currentHeight = 0
     ): bool {
-        /** @global array $_config */
-        global $_config;
-
         // If no id is specified, we use the current
         if ($currentId === 0) {
             $current = $this->current();
@@ -454,7 +448,7 @@ class Block
         }
 
         // All nonces are valid in testnet
-        if ($_config['testnet'] == true) {
+        if ($this->config->get('testnet') == true) {
             return true;
         }
 
@@ -498,19 +492,17 @@ class Block
      * @param array  $data
      * @param bool   $test
      * @return bool
+     * @throws \Exception
      */
     public function parseBlock(string $block, int $height, array $data, bool $test = true): bool
     {
-        /** @global DB $db */
-        global $db;
-
         // Data must be an array
         if ($data === false) {
             return false;
         }
 
-        $account = new Account();
-        $transaction = new Transaction();
+        $account = new Account($this->config, $this->database);
+        $transaction = new Transaction($this->config, $this->database);
 
         // No transactions means all are valid
         if (count($data) == 0) {
@@ -539,14 +531,14 @@ class Block
             $balance[$x['src']] += $x['val'] + $x['fee'];
 
             // Check if the transaction is already on the blockchain
-            if ($db->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $x['id']]) > 0) {
+            if ($this->database->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $x['id']]) > 0) {
                 return false;
             }
         }
 
         // Check if the account has enough balance to perform the transaction
         foreach ($balance as $id => $bal) {
-            $res = $db->single(
+            $res = $this->database->single(
                 'SELECT COUNT(1) FROM accounts WHERE id=:id AND balance>=:balance',
                 [':id' => $id, ':balance' => $bal]
             );
@@ -572,12 +564,13 @@ class Block
     /**
      * Initialise the blockchain and add the genesis block.
      * @return void
+     * @throws \Exception
      */
     private function genesis(): void
     {
         // phpcs:disable Generic.Files.LineLength
+        // Generator: 2P67zUANj7NRKTruQ8nJRHNdKMroY6gLw4NjptTVmYk6Hh1QPYzzfEa9z4gv8qJhuhCNM8p9GDAEDqGUU1awaLW6
         $signature = 'AN1rKvtLTWvZorbiiNk5TBYXLgxiLakra2byFef9qoz1bmRzhQheRtiWivfGSwP6r8qHJGrf8uBeKjNZP1GZvsdKUVVN2XQoL';
-        $generator = '2P67zUANj7NRKTruQ8nJRHNdKMroY6gLw4NjptTVmYk6Hh1QPYzzfEa9z4gv8qJhuhCNM8p9GDAEDqGUU1awaLW6';
         $publicKey = 'PZ8Tyr4Nx8MHsRAGMpZmZ6TWY63dXWSCyjGMdVDanywM3CbqvswVqysqU8XS87FcjpqNijtpRSSQ36WexRDv3rJL5X8qpGvzvznuErSRMfb2G6aNoiaT3aEJ';
         $rewardSignature = '381yXZ3yq2AXHHdXfEm8TDHS4xJ6nkV4suXtUUvLjtvuyi17jCujtwcwXuYALM1F3Wiae2A4yJ6pXL1kTHJxZbrJNgtsKEsb';
         $argon = '$M1ZpVzYzSUxYVFp6cXEwWA$CA6p39MVX7bvdXdIIRMnJuelqequanFfvcxzQjlmiik';
@@ -602,7 +595,7 @@ class Block
         );
 
         if (!$res) {
-            apiErr('Could not add the genesis block.');
+            (new Helpers\Api($this->config))->error('Could not add the genesis block.');
         }
     }
 
@@ -610,6 +603,7 @@ class Block
      * Remove the last 'x' number of blocks.
      * @param int $blocksToRemove
      * @return void
+     * @throws \Exception
      */
     public function pop($blocksToRemove = 1): void
     {
@@ -621,6 +615,7 @@ class Block
      * Delete all blocks greater than or equal to the specified height.
      * @param int $height
      * @return bool
+     * @throws \Exception
      */
     public function delete(int $height): bool
     {
@@ -630,7 +625,7 @@ class Block
 
         /** @global DB $db */
         global $db;
-        $trx = new Transaction();
+        $trx = new Transaction($this->config, $this->database);
 
         $r = $db->run('SELECT * FROM blocks WHERE height>=:height ORDER by height DESC', [":height" => $height]);
 
@@ -670,44 +665,43 @@ class Block
      * Delete a block by its id.
      * @param string $id
      * @return bool
+     * @throws \Exception
      */
     public function deleteId(string $id): bool
     {
-        /** @global DB $db */
-        global $db;
-        $trx = new Transaction();
+        $trx = new Transaction($this->config, $this->database);
 
-        $x = $db->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
+        $blocks = $this->database->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
 
-        if ($x === false) {
+        if (!$blocks) {
             return false;
         }
 
         // Avoid race conditions on blockchain manipulations
-        $db->beginTransaction();
-        $db->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
+        $this->database->beginTransaction();
+        $this->database->exec('LOCK TABLES blocks WRITE, accounts WRITE, transactions WRITE, mempool WRITE');
 
         // Reverse all transactions of the block
-        $res = $trx->reverse($x['id']);
-        if ($res === false) {
+        $res = $trx->reverse($blocks['id']);
+        if (!$res) {
             // Rollback if you can't reverse the transactions
-            $db->rollback();
-            $db->exec('UNLOCK TABLES');
+            $this->database->rollback();
+            $this->database->exec('UNLOCK TABLES');
             return false;
         }
 
         // Remove the actual block
-        $res = $db->run('DELETE FROM blocks WHERE id = :id', [':id' => $x['id']]);
+        $res = $this->database->run('DELETE FROM blocks WHERE id = :id', [':id' => $blocks['id']]);
         if ($res !== 1) {
             // Rollback if you can't delete the block
-            $db->rollback();
-            $db->exec('UNLOCK TABLES');
+            $this->database->rollback();
+            $this->database->exec('UNLOCK TABLES');
             return false;
         }
 
         // Commit and release if all good
-        $db->commit();
-        $db->exec('UNLOCK TABLES');
+        $this->database->commit();
+        $this->database->exec('UNLOCK TABLES');
 
         return true;
     }
@@ -724,6 +718,7 @@ class Block
      * @param int    $difficulty
      * @param string $argon
      * @return string
+     * @throws \Exception
      */
     public function sign(
         string $generator,
@@ -738,7 +733,7 @@ class Block
         $json = json_encode($data);
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
 
-        $signature = ecSign($info, $key);
+        $signature = Keys::ecSign($info, $key);
         return $signature;
     }
 
@@ -753,6 +748,7 @@ class Block
      * @param int    $difficulty
      * @param string $argon
      * @return string
+     * @throws \Exception
      */
     public function hash(
         string $publicKey,
@@ -766,7 +762,7 @@ class Block
     ): string {
         $json = json_encode($data);
         $hash = hash('sha512', "{$publicKey}-{$height}-{$date}-{$nonce}-{$json}-{$signature}-{$difficulty}-{$argon}");
-        return hexToCoin($hash);
+        return Keys::hexToCoin($hash);
     }
 
     /**
@@ -781,20 +777,20 @@ class Block
             return false;
         }
 
-        /** @global DB $db */
-        global $db;
-
         if (!empty($height)) {
-            $block = $db->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
+            $block = $this->database->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
         } else {
-            $block = $db->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
+            $block = $this->database->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
         }
 
         if (!$block) {
             return false;
         }
 
-        $r = $db->run('SELECT * FROM transactions WHERE version > 0 AND block = :block', [":block" => $block['id']]);
+        $r = $this->database->run(
+            'SELECT * FROM transactions WHERE version > 0 AND block = :block',
+            [":block" => $block['id']]
+        );
         $transactions = [];
 
         foreach ($r as $x) {
@@ -818,7 +814,7 @@ class Block
         $block['data'] = $transactions;
 
         // The reward transaction always has version 0
-        $gen = $db->row(
+        $gen = $this->database->row(
             'SELECT public_key, signature FROM transactions WHERE  version=0 AND block=:block',
             [':block' => $block['id']]
         );
@@ -836,12 +832,10 @@ class Block
      */
     public function get(int $height)
     {
-        /** @global DB $db */
-        global $db;
         if (empty($height)) {
             return false;
         }
-        $block = $db->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
+        $block = $this->database->row('SELECT * FROM blocks WHERE height = :height', [':height' => $height]);
         return $block;
     }
 }

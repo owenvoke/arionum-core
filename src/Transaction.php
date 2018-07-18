@@ -2,36 +2,38 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Helpers\Keys;
+use StephenHill\Base58;
+
 /**
  * Class Transaction
  */
-class Transaction
+class Transaction extends Model
 {
     /**
      * Reverse and remove all transactions from a block.
      * @param string $block
      * @return bool
+     * @throws \Exception
      */
     public function reverse(string $block): bool
     {
-        /** @global DB $db */
-        global $db;
-        $account = new Account();
-        $transactions = $db->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
+        $account = new Account($this->config, $this->database);
+        $transactions = $this->database->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
 
         foreach ($transactions as $transaction) {
             if (empty($transaction['src'])) {
                 $transaction['src'] = $account->getAddress($transaction['public_key']);
             }
 
-            $db->run(
+            $this->database->run(
                 'UPDATE accounts SET balance = balance - :val WHERE id = :id',
                 [':id' => $transaction['dst'], ':val' => $transaction['val']]
             );
 
             // On version 0 / reward transaction, don't credit anyone
             if ($transaction['version'] > 0) {
-                $db->run(
+                $this->database->run(
                     'UPDATE accounts SET balance = balance + :val WHERE id = :id',
                     [':id' => $transaction['src'], ':val' => $transaction['val'] + $transaction['fee']]
                 );
@@ -42,7 +44,7 @@ class Transaction
                 $this->addMempool($transaction);
             }
 
-            $result = $db->run('DELETE FROM transactions WHERE id = :id', [':id' => $transaction['id']]);
+            $result = $this->database->run('DELETE FROM transactions WHERE id = :id', [':id' => $transaction['id']]);
             if ($result != 1) {
                 return false;
             }
@@ -54,36 +56,34 @@ class Transaction
     /**
      * Clear the Mempool.
      * @return void
+     * @throws \Exception
      */
     public function cleanMempool(): void
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
         $height = $current['height'];
         $limit = $height - 1000;
 
-        $db->run('DELETE FROM mempool WHERE height < :limit', [':limit' => $limit]);
+        $this->database->run('DELETE FROM mempool WHERE height < :limit', [':limit' => $limit]);
     }
 
     /**
      * Get 'x' transactions from Mempool.
      * @param int $max
      * @return array
+     * @throws \Exception
      */
     public function mempool(int $max): array
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
 
         $current = $block->current();
         $height = $current['height'] + 1;
 
         // Only get the transactions that are not locked with a future height
-        $transactions = $db->run(
+        $transactions = $this->database->run(
             'SELECT * FROM mempool WHERE height <= :height ORDER by val/fee DESC LIMIT :max',
             [':height' => $height, ':max' => $max + 50]
         );
@@ -109,35 +109,39 @@ class Transaction
                 }
 
                 if (empty($transaction['public_key'])) {
-                    _log($transaction['id'].' - Transaction has empty public_key');
+                    $this->log->log($transaction['id'].' - Transaction has empty public_key');
                     continue;
                 }
 
                 if (empty($transaction['src'])) {
-                    _log($transaction['id'].' - Transaction has empty src');
+                    $this->log->log($transaction['id'].' - Transaction has empty src');
                     continue;
                 }
 
                 if (!$this->check($trans, $current['height'])) {
-                    _log($transaction['id'].' - Transaction Check Failed');
+                    $this->log->log($transaction['id'].' - Transaction Check Failed');
                     continue;
                 }
 
                 $balance[$transaction['src']] += $transaction['val'] + $transaction['fee'];
-                if ($db->single('SELECT COUNT(1) FROM transactions WHERE id=:id', [':id' => $transaction['id']]) > 0) {
+                if ($this->database->single(
+                    'SELECT COUNT(1) FROM transactions WHERE id=:id',
+                    [':id' => $transaction['id']]
+                ) > 0
+                ) {
                     // Duplicate transaction
-                    _log($transaction['id'].' - Duplicate transaction');
+                    $this->log->log($transaction['id'].' - Duplicate transaction');
                     continue;
                 }
 
-                $result = $db->single(
+                $result = $this->database->single(
                     'SELECT COUNT(1) FROM accounts WHERE id=:id AND balance>=:balance',
                     [':id' => $transaction['src'], ':balance' => $balance[$transaction['src']]]
                 );
 
                 if ($result == 0) {
                     // Not enough balance for the transactions
-                    _log($transaction['id'].' - Not enough funds in balance');
+                    $this->log->log($transaction['id'].' - Not enough funds in balance');
                     continue;
                 }
 
@@ -158,16 +162,15 @@ class Transaction
      * @param array  $transactionData
      * @param string $peer
      * @return bool
+     * @throws \Exception
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
         $height = $current['height'];
-        $transactionData['id'] = san($transactionData['id']);
+        $transactionData['id'] = Helpers\Sanitise::alphanumeric($transactionData['id']);
 
         $bind = [
             ':peer'       => $peer,
@@ -184,7 +187,7 @@ class Transaction
             ':message'    => $transactionData['message'],
         ];
 
-        $db->run(
+        $this->database->run(
             'INSERT into mempool
              SET peer = :peer, id = :id, public_key = :public_key, height = :height, src = :src, dst = :dst,
              val = :val, fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
@@ -200,16 +203,15 @@ class Transaction
      * @param int    $height
      * @param array  $transactionData
      * @return bool
+     * @throws \Exception
      */
     public function add(string $block, int $height, array $transactionData): bool
     {
-        /** @global DB $db */
-        global $db;
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
 
         $acc->add($transactionData['public_key'], $block);
         $acc->addId($transactionData['dst'], $block);
-        $transactionData['id'] = san($transactionData['id']);
+        $transactionData['id'] = Helpers\Sanitise::alphanumeric($transactionData['id']);
 
         $bind = [
             ':id'         => $transactionData['id'],
@@ -225,7 +227,7 @@ class Transaction
             ':message'    => $transactionData['message'],
         ];
 
-        $result = $db->run(
+        $result = $this->database->run(
             'INSERT into transactions
              SET id = :id, public_key = :public_key, block = :block,  height = :height, dst = :dst, val = :val,
             fee = :fee, signature = :signature, version = :version, message = :message, `date` = :date',
@@ -236,20 +238,20 @@ class Transaction
             return false;
         }
 
-        $db->run(
+        $this->database->run(
             'UPDATE accounts SET balance = balance+:val WHERE id = :id',
             [":id" => $transactionData['dst'], ":val" => $transactionData['val']]
         );
 
         // No debit when the transaction is reward
         if ($transactionData['version'] > 0) {
-            $db->run(
+            $this->database->run(
                 'UPDATE accounts SET balance = (balance - :val) - :fee WHERE id = :id',
                 [":id" => $transactionData['src'], ":val" => $transactionData['val'], ":fee" => $transactionData['fee']]
             );
         }
 
-        $db->run('DELETE FROM mempool WHERE id = :id', [':id' => $transactionData['id']]);
+        $this->database->run('DELETE FROM mempool WHERE id = :id', [':id' => $transactionData['id']]);
 
         return true;
     }
@@ -258,6 +260,7 @@ class Transaction
      * Hash the transaction's most important fields and create the transaction ID.
      * @param array $transactionData
      * @return string
+     * @throws \Exception
      */
     public function hash(array $transactionData): string
     {
@@ -265,7 +268,7 @@ class Transaction
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'].'-'.$transactionData['signature'];
         $hash = hash('sha512', $transactionInfo);
-        return hexToCoin($hash);
+        return Keys::hexToCoin($hash);
     }
 
     /**
@@ -273,30 +276,31 @@ class Transaction
      * @param array $transactionData
      * @param int   $height
      * @return bool
+     * @throws \Exception
      */
     public function check(array $transactionData, int $height = 0): bool
     {
         // If no block is specified, use the current block
         if ($height === 0) {
-            $block = new Block();
+            $block = new Block($this->config, $this->database);
             $current = $block->current();
             $height = $current['height'];
         }
 
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
         $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'];
 
         // The value must be >=0
         if ($transactionData['val'] < 0) {
-            _log($transactionData['id'].' - Value below 0');
+            $this->log->log($transactionData['id'].' - Value below 0');
             return false;
         }
 
         // The fee must be >=0
         if ($transactionData['fee'] < 0) {
-            _log($transactionData['id'].' - Fee below 0');
+            $this->log->log($transactionData['id'].' - Fee below 0');
             return false;
         }
 
@@ -312,37 +316,37 @@ class Transaction
         }
         // Added fee does not match
         if ($fee != $transactionData['fee']) {
-            _log($transactionData['id'].' - Fee not 0.25%');
+            $this->log->log($transactionData['id'].' - Fee not 0.25%');
             return false;
         }
 
         // Invalid destination address
         if (!$acc->valid($transactionData['dst'])) {
-            _log($transactionData['id'].' - Invalid destination address');
+            $this->log->log($transactionData['id'].' - Invalid destination address');
             return false;
         }
 
         // Reward transactions are not added via this function
         if ($transactionData['version'] < 1) {
-            _log($transactionData['id'].' - Invalid version <1');
+            $this->log->log($transactionData['id'].' - Invalid version <1');
             return false;
         }
 
         // Public key must be at least 15 chars / probably should be replaced with the validator function
         if (strlen($transactionData['public_key']) < 15) {
-            _log($transactionData['id'].' - Invalid public key size');
+            $this->log->log($transactionData['id'].' - Invalid public key size');
             return false;
         }
 
         // No transactions before the genesis
         if ($transactionData['date'] < 1511725068) {
-            _log($transactionData['id'].' - Date before genesis');
+            $this->log->log($transactionData['id'].' - Date before genesis');
             return false;
         }
 
         // No future transactions
         if ($transactionData['date'] > time() + 86400) {
-            _log($transactionData['id'].' - Date in the future');
+            $this->log->log($transactionData['id'].' - Date in the future');
             return false;
         }
 
@@ -357,19 +361,19 @@ class Transaction
         if ($transactionData['id'] !== $transactionId) {
             // Fix for broken Base58 library which was used until block 16900.
             // Accept hashes without the first 1 or 2 bytes.
-            $xs = base58Decode($transactionData['id']);
+            $xs = (new Base58())->decode($transactionData['id']);
             if (((strlen($xs) !== 63 || substr($transactionId, 1) !== $transactionData['id'])
                     && (strlen($xs) !== 62 || substr($transactionId, 2) !== $transactionData['id']))
                 || $height > 16900
             ) {
-                _log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
+                $this->log->log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
                 return false;
             }
         }
 
         // Verify the ECDSA signature
         if (!$acc->checkSignature($transactionInfo, $transactionData['signature'], $transactionData['public_key'])) {
-            _log($transactionData['id'].' - Invalid signature');
+            $this->log->log($transactionData['id'].' - Invalid signature');
             return false;
         }
 
@@ -381,13 +385,14 @@ class Transaction
      * @param array  $transactionData
      * @param string $privateKey
      * @return string
+     * @throws \Exception
      */
     public function sign(array $transactionData, string $privateKey): string
     {
         $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'];
-        $signature = ecSign($transactionInfo, $privateKey);
+        $signature = Keys::ecSign($transactionInfo, $privateKey);
 
         return $signature;
     }
@@ -399,25 +404,22 @@ class Transaction
      */
     public function export(string $id): array
     {
-        /** @global DB $db */
-        global $db;
-        return $db->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
+        return $this->database->row('SELECT * FROM mempool WHERE id = :id', [':id' => $id]);
     }
 
     /**
      * Get the transaction data as array.
      * @param string $transactionId
      * @return array|bool
+     * @throws \Exception
      */
     public function getTransaction(string $transactionId)
     {
-        /** @global DB $db */
-        global $db;
-        $acc = new Account();
-        $block = new Block();
+        $acc = new Account($this->config, $this->database);
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
 
-        $transactionData = $db->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
+        $transactionData = $this->database->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
 
         if (!$transactionData) {
             return false;
@@ -461,29 +463,28 @@ class Transaction
      * @param string $height
      * @param string $transactionId
      * @return array|bool
+     * @throws \Exception
      */
     public function getTransactions($height = '', $transactionId = '')
     {
-        /** @global DB $db */
-        global $db;
-        $block = new Block();
+        $block = new Block($this->config, $this->database);
         $current = $block->current();
-        $acc = new Account();
+        $acc = new Account($this->config, $this->database);
 
-        $height = san($height);
-        $transactionId = san($transactionId);
+        $height = Helpers\Sanitise::alphanumeric($height);
+        $transactionId = Helpers\Sanitise::alphanumeric($transactionId);
 
         if (empty($transactionId) && empty($height)) {
             return false;
         }
 
         if (!empty($transactionId)) {
-            $transactions = $db->run(
+            $transactions = $this->database->run(
                 'SELECT * FROM transactions WHERE block = :id AND version > 0',
                 [':id' => $transactionId]
             );
         } else {
-            $transactions = $db->run(
+            $transactions = $this->database->run(
                 'SELECT * FROM transactions WHERE height = :height AND version > 0',
                 [':height' => $height]
             );
@@ -534,9 +535,7 @@ class Transaction
      */
     public function getMempoolTransaction(string $id)
     {
-        /** @global DB $db */
-        global $db;
-        $transactionData = $db->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
+        $transactionData = $this->database->row('SELECT * FROM mempool WHERE id=:id', [':id' => $id]);
 
         if (!$transactionData) {
             return false;

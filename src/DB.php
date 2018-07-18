@@ -115,8 +115,8 @@ class DB extends PDO
     }
 
     /**
-     * @param string $sql
-     * @param string $bind
+     * @param string       $sql
+     * @param array|string $bind
      * @return bool|mixed
      */
     public function single(string $sql, $bind = '')
@@ -133,8 +133,9 @@ class DB extends PDO
         } catch (PDOException $e) {
             $this->error = $e->getMessage();
             $this->debug();
-            return false;
         }
+
+        return false;
     }
 
     /**
@@ -161,8 +162,9 @@ class DB extends PDO
         } catch (PDOException $e) {
             $this->error = $e->getMessage();
             $this->debug();
-            return false;
         }
+
+        return false;
     }
 
     /**
@@ -180,11 +182,10 @@ class DB extends PDO
         if (count($query) > 1) {
             return $query;
         }
-        if (count($query) == 1) {
-            foreach ($query as $row) {
-                $result = $row;
-            }
-            return $result;
+        if (count($query) === 1) {
+            return $query[0];
         }
+
+        return false;
     }
 }

@@ -10,7 +10,8 @@
         "ext-json": "*",
         "ext-openssl": "*",
         "ext-pcre": "*",
-        "ext-PDO": "*"
+        "ext-PDO": "*",
+        "stephenhill/base58": "^1.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^7.0",
@@ -19,10 +20,7 @@
     "autoload": {
         "psr-4": {
             "Arionum\\Arionum\\": "src"
-        },
-        "files": [
-            "src/functions.inc.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
