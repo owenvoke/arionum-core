@@ -5,6 +5,9 @@ namespace Arionum\Arionum\Helpers;
 use Arionum\Arionum\Config;
 use Arionum\Arionum\Traits\HasConfig;
 
+/**
+ * Class Log
+ */
 class Log
 {
     use HasConfig;
@@ -20,37 +23,66 @@ class Log
 
     /**
      * Log function, this only shows in the CLI.
-     * @param string $data
+     * @param string $logData
      * @return void
      *
      * @todo Convert to Monolog
      * @link https://github.com/pxgamer/arionum/issues/3
      * @throws \Exception
      */
-    public function log(string $data): void
+    public function log(string $logData): void
     {
-        $date = date("[Y-m-d H:i:s]");
+        $logInfo = $this->getLogFormat($logData);
+
+        $this->logToConsole($logInfo);
+
+        $this->logToFile($logInfo);
+    }
+
+    /**
+     * @param string $logData
+     * @return string
+     * @throws \Exception
+     */
+    private function getLogFormat(string $logData): string
+    {
+        $date = date('[Y-m-d H:i:s]');
         $trace = debug_backtrace();
-        $loc = count($trace) - 1;
-        $file = substr($trace[$loc]['file'], strrpos($trace[$loc]['file'], "/") + 1);
+        $lineNumber = count($trace) - 1;
+        $file = substr($trace[$lineNumber]['file'], strrpos($trace[$lineNumber]['file'], '/') + 1);
 
-        $res = "$date ".$file.":".$trace[$loc]['line'];
+        $logInfo = $date.' '.$file.':'.$trace[$lineNumber]['line'];
 
-        if (!empty($trace[$loc]['class'])) {
-            $res .= "---".$trace[$loc]['class'];
+        if (!empty($trace[$lineNumber]['class'])) {
+            $logInfo .= '---'.$trace[$lineNumber]['class'];
         }
 
-        if (!empty($trace[$loc]['function']) && $trace[$loc]['function'] != '_log') {
-            $res .= '->'.$trace[$loc]['function'].'()';
+        if (!empty($trace[$lineNumber]['function']) && $trace[$lineNumber]['function'] != '_log') {
+            $logInfo .= '->'.$trace[$lineNumber]['function'].'()';
         }
 
-        $res .= " $data \n";
+        return $logInfo.' '.$logData.' '.PHP_EOL;
+    }
+
+    /**
+     * @param string $logInfo
+     * @throws \Exception
+     */
+    private function logToConsole(string $logInfo)
+    {
         if (php_sapi_name() === 'cli') {
-            echo $res;
+            echo $logInfo;
         }
+    }
 
-        if ($this->config->get('enable_logging') == true) {
-            @file_put_contents($this->config->get('log_file'), $res, FILE_APPEND);
+    /**
+     * @param string $logInfo
+     * @throws \Exception
+     */
+    private function logToFile(string $logInfo)
+    {
+        if ($this->config->get('enable_logging')) {
+            @file_put_contents($this->config->get('log_file'), $logInfo, FILE_APPEND);
         }
     }
 }
