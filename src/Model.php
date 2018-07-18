@@ -2,19 +2,15 @@
 
 namespace Arionum\Arionum;
 
+use Arionum\Arionum\Traits\HasConfig;
+use Arionum\Arionum\Traits\HasDatabase;
+
 /**
  * Class Model
  */
 class Model
 {
-    /**
-     * @var Config
-     */
-    protected $config;
-    /**
-     * @var DB
-     */
-    protected $database;
+    use HasConfig, HasDatabase;
 
     /**
      * Model constructor.
@@ -23,7 +19,7 @@ class Model
      */
     public function __construct(Config $config, DB $database)
     {
-        $this->config = $config;
-        $this->database = $database;
+        $this->setConfig($config);
+        $this->setDatabase($database);
     }
 }
