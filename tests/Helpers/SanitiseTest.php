@@ -1,6 +1,6 @@
 <?php
 
-namespace Arionum\Arionum\Helpers;
+namespace Arionum\Core\Helpers;
 
 use PHPUnit\Framework\TestCase;
 
