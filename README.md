@@ -1,4 +1,4 @@
-# arionum
+# arionum-core
 
 [![Latest Version on Packagist][ico-version]][link-packagist]
 [![Software License][ico-license]](LICENSE.md)
@@ -7,14 +7,14 @@
 [![Code Coverage][ico-code-quality]][link-code-quality]
 [![Total Downloads][ico-downloads]][link-downloads]
 
-A collection of core classes for the Arionum network.
+The core package for the Arionum network.
 
 ## Install
 
 Via Composer
 
 ```bash
-$ composer require pxgamer/arionum
+$ composer require arionum/core
 ```
 
 ## Usage
@@ -30,10 +30,6 @@ Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed re
 ```bash
 $ composer test
 ```
-
-## Contributing
-
-Please see [CONTRIBUTING](.github/CONTRIBUTING.md) and [CODE_OF_CONDUCT](.github/CODE_OF_CONDUCT.md) for details.
 
 ## Security
 
