@@ -1,9 +1,9 @@
 <?php
 
-namespace Arionum\Arionum\Helpers;
+namespace Arionum\Core\Helpers;
 
-use Arionum\Arionum\Config;
-use Arionum\Arionum\Traits\HasConfig;
+use Arionum\Core\Config;
+use Arionum\Core\Traits\HasConfig;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -34,7 +34,7 @@ class ConfigTest extends TestCase
 
     /**
      * @test
-     * @expectedException \Arionum\Arionum\Exceptions\ConfigPropertyNotFoundException
+     * @expectedException \Arionum\Core\Exceptions\ConfigPropertyNotFoundException
      * @throws \Exception
      */
     public function itThrowsAnExceptionWhenThePropertyIsNotSet()
