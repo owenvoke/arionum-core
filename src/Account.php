@@ -10,6 +10,8 @@ use StephenHill\Base58;
  */
 class Account extends Model
 {
+    use Traits\HasAlias;
+
     /**
      * Insert the account into the database and update the public key if empty.
      * @param string $publicKey
