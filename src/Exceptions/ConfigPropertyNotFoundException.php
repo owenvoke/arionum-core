@@ -1,6 +1,6 @@
 <?php
 
-namespace Arionum\Arionum\Exceptions;
+namespace Arionum\Core\Exceptions;
 
 /**
  * Class ConfigPropertyNotFoundException

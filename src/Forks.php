@@ -1,6 +1,6 @@
 <?php
 
-namespace Arionum\Arionum;
+namespace Arionum\Core;
 
 /**
  * Class Forks

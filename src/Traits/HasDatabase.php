@@ -1,8 +1,8 @@
 <?php
 
-namespace Arionum\Arionum\Traits;
+namespace Arionum\Core\Traits;
 
-use Arionum\Arionum\DB;
+use Arionum\Core\DB;
 
 /**
  * Trait HasDatabase

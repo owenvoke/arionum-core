@@ -1,8 +1,8 @@
 <?php
 
-namespace Arionum\Arionum;
+namespace Arionum\Core;
 
-use Arionum\Arionum\Helpers\Keys;
+use Arionum\Core\Helpers\Keys;
 use StephenHill\Base58;
 
 /**

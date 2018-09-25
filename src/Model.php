@@ -1,11 +1,11 @@
 <?php
 
-namespace Arionum\Arionum;
+namespace Arionum\Core;
 
-use Arionum\Arionum\Helpers\Log;
-use Arionum\Arionum\Traits\HasConfig;
-use Arionum\Arionum\Traits\HasDatabase;
-use Arionum\Arionum\Traits\HasLogging;
+use Arionum\Core\Helpers\Log;
+use Arionum\Core\Traits\HasConfig;
+use Arionum\Core\Traits\HasDatabase;
+use Arionum\Core\Traits\HasLogging;
 
 /**
  * Class Model

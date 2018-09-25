@@ -1,7 +1,7 @@
 {
-    "name": "pxgamer/arionum",
+    "name": "arionum/core",
     "type": "library",
-    "description": "A collection of core classes for the Arionum network.",
+    "description": "The core package for the Arionum network.",
     "license": "MIT",
     "require": {
         "php": "^7.2",
@@ -19,12 +19,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Arionum\\Arionum\\": "src"
+            "Arionum\\Core\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Arionum\\Arionum\\": "tests"
+            "Arionum\\Core\\": "tests"
         }
     },
     "scripts": {

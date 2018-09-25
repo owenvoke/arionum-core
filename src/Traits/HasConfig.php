@@ -1,8 +1,8 @@
 <?php
 
-namespace Arionum\Arionum\Traits;
+namespace Arionum\Core\Traits;
 
-use Arionum\Arionum\Config;
+use Arionum\Core\Config;
 
 /**
  * Trait HasConfig

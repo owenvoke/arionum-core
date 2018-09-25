@@ -1,8 +1,8 @@
 <?php
 
-namespace Arionum\Arionum\Traits;
+namespace Arionum\Core\Traits;
 
-use Arionum\Arionum\Helpers\Log;
+use Arionum\Core\Helpers\Log;
 
 /**
  * Trait HasLogging

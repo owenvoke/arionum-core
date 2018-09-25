@@ -1,6 +1,6 @@
 <?php
 
-namespace Arionum\Arionum;
+namespace Arionum\Core;
 
 use PDO;
 use PDOException;
