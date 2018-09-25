@@ -254,12 +254,12 @@ class Account extends Model
 
             // Version 0 -> reward transaction, version 1 -> normal transaction
             $transaction['type'] = "other";
-            if ($transactionData['version'] == 0) {
+            if ($transactionData['version'] === 0) {
                 $transaction['type'] = "mining";
-            } elseif ($transactionData['version'] == 1) {
+            } elseif ($transactionData['version'] === 1) {
                 $transaction['type'] = "debit";
 
-                if ($transactionData['dst'] == $address) {
+                if ($transactionData['dst'] === $address) {
                     $transaction['type'] = "credit";
                 }
             }
@@ -319,6 +319,21 @@ class Account extends Model
     public function publicKey(string $address): string
     {
         return $this->database->single('SELECT public_key FROM accounts WHERE id = :id', [':id' => $address]);
+    }
+
+    /**
+     * Retrieve a masternode by its public key if it exists.
+     * @param string $publicKey
+     * @return bool
+     */
+    public function getMasternode(string $publicKey)
+    {
+        $result = $this->database->row(
+            'SELECT * FROM masternode WHERE public_key = :public_key',
+            [':public_key' => $publicKey]
+        );
+
+        return (empty($result['public_key'])) ? false : $result;
     }
 
     /**
