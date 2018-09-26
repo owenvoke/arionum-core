@@ -3,8 +3,7 @@
 namespace Arionum\Core\Helpers;
 
 use Arionum\Core\Config;
-use Arionum\Core\Traits\HasConfig;
-use Arionum\Core\Traits\HasLogging;
+use Arionum\Core\Helpers\Log;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -12,8 +11,6 @@ use PHPUnit\Framework\TestCase;
  */
 class LogTest extends TestCase
 {
-    use HasConfig, HasLogging;
-
     const TEST_DATA = 'testing123';
     const BUILD_DIRECTORY = __DIR__.'/../../build';
     const LOG_FILE_LOCATION = self::BUILD_DIRECTORY.'/aro.log';
@@ -31,12 +28,10 @@ class LogTest extends TestCase
             unlink(self::LOG_FILE_LOCATION);
         }
 
-        $this->setConfig(new Config([
+        Config::setGlobal([
             'enable_logging' => false,
             'log_file'       => self::LOG_FILE_LOCATION,
-        ]));
-
-        $this->setLogger(new Log($this->config));
+        ]);
     }
 
     /**
@@ -58,7 +53,7 @@ class LogTest extends TestCase
     {
         $this->expectOutputRegex('/'.self::TEST_DATA.'/');
 
-        $this->config->set('enable_logging', true);
+        Config::set('enable_logging', true);
         Log::log(self::TEST_DATA);
 
         $this->assertFileExists(self::LOG_FILE_LOCATION);

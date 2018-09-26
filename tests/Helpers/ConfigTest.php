@@ -3,7 +3,6 @@
 namespace Arionum\Core\Helpers;
 
 use Arionum\Core\Config;
-use Arionum\Core\Traits\HasConfig;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -11,16 +10,14 @@ use PHPUnit\Framework\TestCase;
  */
 class ConfigTest extends TestCase
 {
-    use HasConfig;
-
     /**
      * Set up the requirements for the unit tests.
      */
     public function setUp()
     {
-        $this->setConfig(new Config([
+        Config::setGlobal([
             'testing' => true,
-        ]));
+        ]);
     }
 
     /**
@@ -29,7 +26,7 @@ class ConfigTest extends TestCase
      */
     public function itCanGetAConfigParameter()
     {
-        $this->assertEquals(true, $this->config->get('testing'));
+        $this->assertEquals(true, Config::get('testing'));
     }
 
     /**
@@ -39,16 +36,17 @@ class ConfigTest extends TestCase
      */
     public function itThrowsAnExceptionWhenThePropertyIsNotSet()
     {
-        $this->assertEquals(true, $this->config->get('does-not-exist'));
+        $this->assertEquals(true, Config::get('does-not-exist'));
     }
 
     /**
      * @test
+     * @throws \Arionum\Core\Exceptions\ConfigPropertyNotFoundException
      */
     public function itCanSetAConfigParameter()
     {
-        $this->config->set('testing', false);
+        Config::set('testing', false);
 
-        $this->assertEquals(false, $this->config->get('testing'));
+        $this->assertEquals(false, Config::get('testing'));
     }
 }
