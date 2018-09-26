@@ -12,15 +12,14 @@ class Config
     /**
      * @var array
      */
-    protected $properties;
+    protected static $properties;
 
     /**
-     * Config constructor.
      * @param array $properties
      */
-    public function __construct(array $properties = [])
+    public function setGlobal(array $properties = [])
     {
-        $this->properties = $properties;
+        static::$properties = $properties;
     }
 
     /**
@@ -28,10 +27,10 @@ class Config
      * @return mixed|null
      * @throws ConfigPropertyNotFoundException
      */
-    public function get(string $key)
+    public static function get(string $key)
     {
-        if (key_exists($key, $this->properties)) {
-            return $this->properties[$key];
+        if (key_exists($key, static::$properties)) {
+            return static::$properties[$key];
         }
 
         throw new Exceptions\ConfigPropertyNotFoundException();
@@ -40,12 +39,10 @@ class Config
     /**
      * @param string $key
      * @param mixed  $value
-     * @return $this
+     * @return void
      */
-    public function set(string $key, $value)
+    public static function set(string $key, $value)
     {
-        $this->properties[$key] = $value;
-
-        return $this;
+        static::$properties[$key] = $value;
     }
 }
