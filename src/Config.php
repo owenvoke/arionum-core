@@ -17,7 +17,7 @@ class Config
     /**
      * @param array $properties
      */
-    public function setGlobal(array $properties = [])
+    public static function setGlobal(array $properties = [])
     {
         self::$properties = $properties;
     }
