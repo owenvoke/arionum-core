@@ -19,7 +19,7 @@ class Config
      */
     public function setGlobal(array $properties = [])
     {
-        static::$properties = $properties;
+        self::$properties = $properties;
     }
 
     /**
@@ -29,8 +29,8 @@ class Config
      */
     public static function get(string $key)
     {
-        if (key_exists($key, static::$properties)) {
-            return static::$properties[$key];
+        if (key_exists($key, self::$properties)) {
+            return self::$properties[$key];
         }
 
         throw new Exceptions\ConfigPropertyNotFoundException();
@@ -43,6 +43,6 @@ class Config
      */
     public static function set(string $key, $value)
     {
-        static::$properties[$key] = $value;
+        self::$properties[$key] = $value;
     }
 }
