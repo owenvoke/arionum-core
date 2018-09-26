@@ -3,24 +3,12 @@
 namespace Arionum\Core\Helpers;
 
 use Arionum\Core\Config;
-use Arionum\Core\Traits\HasConfig;
 
 /**
  * Class Log
  */
 class Log
 {
-    use HasConfig;
-
-    /**
-     * Log constructor.
-     * @param Config $config
-     */
-    public function __construct(Config $config)
-    {
-        $this->setConfig($config);
-    }
-
     /**
      * Log function, this only shows in the CLI.
      * @param string $logData
@@ -30,13 +18,13 @@ class Log
      * @todo Convert to Monolog
      * @link https://github.com/pxgamer/arionum/issues/3
      */
-    public function log(string $logData): void
+    public static function log(string $logData): void
     {
-        $logInfo = $this->getLogFormat($logData);
+        $logInfo = self::getLogFormat($logData);
 
-        $this->logToConsole($logInfo);
+        self::logToConsole($logInfo);
 
-        $this->logToFile($logInfo);
+        self::logToFile($logInfo);
     }
 
     /**
@@ -44,7 +32,7 @@ class Log
      * @return string
      * @throws \Exception
      */
-    private function getLogFormat(string $logData): string
+    private static function getLogFormat(string $logData): string
     {
         $date = date('[Y-m-d H:i:s]');
         $trace = debug_backtrace();
@@ -69,7 +57,7 @@ class Log
      * @return void
      * @throws \Exception
      */
-    private function logToConsole(string $logInfo): void
+    private static function logToConsole(string $logInfo): void
     {
         if (php_sapi_name() === 'cli') {
             echo $logInfo;
@@ -81,12 +69,12 @@ class Log
      * @return void
      * @throws \Exception
      */
-    private function logToFile(string $logInfo): void
+    private static function logToFile(string $logInfo): void
     {
-        $logFile = $this->config->get('log_file');
+        $logFile = Config::get('log_file');
         $logDirectory = dirname($logFile);
 
-        if ($this->config->get('enable_logging')
+        if (Config::get('enable_logging')
             && is_dir($logDirectory)
             && is_writable($logDirectory)
         ) {

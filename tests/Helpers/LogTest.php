@@ -47,7 +47,7 @@ class LogTest extends TestCase
     {
         $this->expectOutputRegex('/'.self::TEST_DATA.'/');
 
-        $this->log->log(self::TEST_DATA);
+        Log::log(self::TEST_DATA);
     }
 
     /**
@@ -59,7 +59,7 @@ class LogTest extends TestCase
         $this->expectOutputRegex('/'.self::TEST_DATA.'/');
 
         $this->config->set('enable_logging', true);
-        $this->log->log(self::TEST_DATA);
+        Log::log(self::TEST_DATA);
 
         $this->assertFileExists(self::LOG_FILE_LOCATION);
     }
