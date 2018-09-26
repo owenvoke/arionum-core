@@ -3,6 +3,7 @@
 namespace Arionum\Core;
 
 use Arionum\Core\Helpers\Keys;
+use Arionum\Core\Helpers\Log;
 
 /**
  * Class Block
@@ -34,8 +35,8 @@ class Block extends Model
         string $rewardSignature,
         string $argon
     ): bool {
-        $account = new Account($this->config, $this->database);
-        $transactionData = new Transaction($this->config, $this->database);
+        $account = new Account($this->database);
+        $transactionData = new Transaction($this->database);
 
         $generator = $account->getAddress($publicKey);
 
@@ -55,12 +56,12 @@ class Block extends Model
         // Create the block data and check it against the signature
         $info = "{$generator}-{$height}-{$date}-{$nonce}-{$json}-{$difficulty}-{$argon}";
         if (!$account->checkSignature($info, $signature, $publicKey)) {
-            $this->log->log('Block signature check failed');
+            Log::log('Block signature check failed');
             return false;
         }
 
         if (!$this->parseBlock($hash, $height, $data, true)) {
-            $this->log->log('Parse block failed');
+            Log::log('Parse block failed');
             return false;
         }
 
@@ -92,7 +93,7 @@ class Block extends Model
             .$transaction['version'].'-'.$transaction['public_key'].'-'.$transaction['date'];
 
         if (!$account->checkSignature($info, $rewardSignature, $publicKey)) {
-            $this->log->log('Reward signature failed');
+            Log::log('Reward signature failed');
             return false;
         }
 
@@ -120,7 +121,7 @@ class Block extends Model
 
         if ($res !== 1) {
             // Rollback and exit if it fails
-            $this->log->log('Block DB insert failed');
+            Log::log('Block DB insert failed');
             $this->database->rollback();
             $this->database->exec('UNLOCK TABLES');
 
@@ -298,26 +299,26 @@ class Block extends Model
     {
         // Argon must have at least 20 chars
         if (strlen($data['argon']) < 20) {
-            $this->log->log("Invalid block argon - $data[argon]");
+            Log::log("Invalid block argon - $data[argon]");
             return false;
         }
-        $account = new Account($this->config, $this->database);
+        $account = new Account($this->database);
 
         // Generators public key must be valid
         if (!$account->validKey($data['public_key'])) {
-            $this->log->log("Invalid public key - $data[public_key]");
+            Log::log("Invalid public key - $data[public_key]");
             return false;
         }
 
         // Difficulty should be the same as our calculation
         if ($data['difficulty'] != $this->difficulty()) {
-            $this->log->log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
+            Log::log("Invalid difficulty - $data[difficulty] - ".$this->difficulty());
             return false;
         }
 
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($data['public_key'], $data['nonce'], $data['argon'])) {
-            $this->log->log('Mine check failed');
+            Log::log('Mine check failed');
             return false;
         }
 
@@ -337,7 +338,7 @@ class Block extends Model
     {
         // Check the argon hash and the nonce to produce a valid block
         if (!$this->mine($publicKey, $nonce, $argon)) {
-            $this->log->log('Forge failed - Invalid argon');
+            Log::log('Forge failed - Invalid argon');
             return false;
         }
 
@@ -346,16 +347,16 @@ class Block extends Model
         $height = $current['height'] += 1;
         $date = time();
         if ($date <= $current['date']) {
-            $this->log->log('Forge failed - Date older than last block');
+            Log::log('Forge failed - Date older than last block');
             return false;
         }
 
         // Get the Mempool transactions
-        $transaction = new Transaction($this->config, $this->database);
+        $transaction = new Transaction($this->database);
         $data = $transaction->mempool($this->maxTransactions());
 
         $difficulty = $this->difficulty();
-        $account = new Account($this->config, $this->database);
+        $account = new Account($this->database);
         $generator = $account->getAddress($publicKey);
 
         // Always sort the transactions in the same way
@@ -395,7 +396,7 @@ class Block extends Model
         );
 
         if (!$result) {
-            $this->log->log('Forge failed - Block->Add() failed');
+            Log::log('Forge failed - Block->Add() failed');
             return false;
         }
 
@@ -448,7 +449,7 @@ class Block extends Model
         }
 
         // All nonces are valid in testnet
-        if ($this->config->get('testnet') == true) {
+        if (Config::get('testnet') == true) {
             return true;
         }
 
@@ -500,8 +501,8 @@ class Block extends Model
             return false;
         }
 
-        $account = new Account($this->config, $this->database);
-        $transaction = new Transaction($this->config, $this->database);
+        $account = new Account($this->database);
+        $transaction = new Transaction($this->database);
 
         // No transactions means all are valid
         if (count($data) === 0) {
@@ -594,7 +595,7 @@ class Block extends Model
             $rewardSignature,
             $argon
         )) {
-            (new Helpers\Api($this->config))->error('Could not add the genesis block.');
+            Helpers\Api::error('Could not add the genesis block.');
         }
     }
 
@@ -622,7 +623,7 @@ class Block extends Model
             $height = 2;
         }
 
-        $transaction = new Transaction($this->config, $this->database);
+        $transaction = new Transaction($this->database);
 
         $blocks = $this->database->run(
             'SELECT * FROM blocks WHERE height>=:height ORDER by height DESC',
@@ -667,7 +668,7 @@ class Block extends Model
      */
     public function deleteId(string $id): bool
     {
-        $transaction = new Transaction($this->config, $this->database);
+        $transaction = new Transaction($this->database);
 
         $blocks = $this->database->row('SELECT * FROM blocks WHERE id = :id', [':id' => $id]);
 

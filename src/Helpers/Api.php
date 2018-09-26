@@ -3,24 +3,12 @@
 namespace Arionum\Core\Helpers;
 
 use Arionum\Core\Config;
-use Arionum\Core\Traits\HasConfig;
 
 /**
  * Class Api
  */
 class Api
 {
-    use HasConfig;
-
-    /**
-     * Api constructor.
-     * @param Config $config
-     */
-    public function __construct(Config $config)
-    {
-        $this->setConfig($config);
-    }
-
     /**
      * Post data to a URL endpoint (usually a peer).
      * The data is an array that is JSON encoded and sent as a data parameter.
@@ -31,7 +19,7 @@ class Api
      * @return bool
      * @throws \Exception
      */
-    public function post(string $url, array $data = [], int $timeout = 60, bool $debug = false): bool
+    public static function post(string $url, array $data = [], int $timeout = 60, bool $debug = false): bool
     {
         if ($debug) {
             echo PHP_EOL.'Peer post: '.$url.PHP_EOL;
@@ -40,7 +28,7 @@ class Api
         $postData = http_build_query(
             [
                 'data' => json_encode($data),
-                "coin" => $this->config->get('coin'),
+                "coin" => Config::get('coin'),
             ]
         );
 
@@ -65,7 +53,7 @@ class Api
         $result = json_decode($peerResponse, true);
 
         // The function will return false if something goes wrong
-        if ($result['status'] !== 'ok' || $result['coin'] !== $this->config->get('coin')) {
+        if ($result['status'] !== 'ok' || $result['coin'] !== Config::get('coin')) {
             return false;
         }
 
@@ -78,13 +66,13 @@ class Api
      * @return void
      * @throws \Exception
      */
-    public function echo($data): void
+    public static function echo($data): void
     {
         exit(json_encode(
             [
                 'status' => 'ok',
                 'data'   => $data,
-                'coin'   => $this->config->get('coin'),
+                'coin'   => Config::get('coin'),
             ]
         ));
     }
@@ -95,13 +83,13 @@ class Api
      * @return void
      * @throws \Exception
      */
-    public function error($data): void
+    public static function error($data): void
     {
         exit(json_encode(
             [
                 'status' => 'error',
                 'data'   => $data,
-                'coin'   => $this->config->get('coin'),
+                'coin'   => Config::get('coin'),
             ]
         ));
     }

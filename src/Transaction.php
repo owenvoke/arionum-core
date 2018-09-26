@@ -3,6 +3,7 @@
 namespace Arionum\Core;
 
 use Arionum\Core\Helpers\Keys;
+use Arionum\Core\Helpers\Log;
 use StephenHill\Base58;
 
 /**
@@ -18,7 +19,7 @@ class Transaction extends Model
      */
     public function reverse(string $block): bool
     {
-        $account = new Account($this->config, $this->database);
+        $account = new Account($this->database);
         $transactions = $this->database->run('SELECT * FROM transactions WHERE block = :block', [':block' => $block]);
 
         foreach ($transactions as $transaction) {
@@ -60,7 +61,7 @@ class Transaction extends Model
      */
     public function cleanMempool(): void
     {
-        $block = new Block($this->config, $this->database);
+        $block = new Block($this->database);
         $current = $block->current();
 
         $height = $current['height'];
@@ -77,7 +78,7 @@ class Transaction extends Model
      */
     public function mempool(int $max): array
     {
-        $block = new Block($this->config, $this->database);
+        $block = new Block($this->database);
 
         $current = $block->current();
         $height = $current['height'] + 1;
@@ -109,17 +110,17 @@ class Transaction extends Model
                 }
 
                 if (empty($transaction['public_key'])) {
-                    $this->log->log($transaction['id'].' - Transaction has empty public_key');
+                    Log::log($transaction['id'].' - Transaction has empty public_key');
                     continue;
                 }
 
                 if (empty($transaction['src'])) {
-                    $this->log->log($transaction['id'].' - Transaction has empty src');
+                    Log::log($transaction['id'].' - Transaction has empty src');
                     continue;
                 }
 
                 if (!$this->check($trans, $current['height'])) {
-                    $this->log->log($transaction['id'].' - Transaction Check Failed');
+                    Log::log($transaction['id'].' - Transaction Check Failed');
                     continue;
                 }
 
@@ -130,7 +131,7 @@ class Transaction extends Model
                 ) > 0
                 ) {
                     // Duplicate transaction
-                    $this->log->log($transaction['id'].' - Duplicate transaction');
+                    Log::log($transaction['id'].' - Duplicate transaction');
                     continue;
                 }
 
@@ -141,7 +142,7 @@ class Transaction extends Model
 
                 if ($result == 0) {
                     // Not enough balance for the transactions
-                    $this->log->log($transaction['id'].' - Not enough funds in balance');
+                    Log::log($transaction['id'].' - Not enough funds in balance');
                     continue;
                 }
 
@@ -166,7 +167,7 @@ class Transaction extends Model
      */
     public function addMempool(array $transactionData, string $peer = ''): bool
     {
-        $block = new Block($this->config, $this->database);
+        $block = new Block($this->database);
         $current = $block->current();
 
         $height = $current['height'];
@@ -207,7 +208,7 @@ class Transaction extends Model
      */
     public function add(string $block, int $height, array $transactionData): bool
     {
-        $acc = new Account($this->config, $this->database);
+        $acc = new Account($this->database);
 
         $acc->add($transactionData['public_key'], $block);
         $acc->addId($transactionData['dst'], $block);
@@ -282,25 +283,25 @@ class Transaction extends Model
     {
         // If no block is specified, use the current block
         if ($height === 0) {
-            $block = new Block($this->config, $this->database);
+            $block = new Block($this->database);
             $current = $block->current();
             $height = $current['height'];
         }
 
-        $acc = new Account($this->config, $this->database);
+        $acc = new Account($this->database);
         $transactionInfo = $transactionData['val'].'-'.$transactionData['fee'].'-'.$transactionData['dst'].'-'
             .$transactionData['message'].'-'.$transactionData['version'].'-'.$transactionData['public_key'].'-'
             .$transactionData['date'];
 
         // The value must be >=0
         if ($transactionData['val'] < 0) {
-            $this->log->log($transactionData['id'].' - Value below 0');
+            Log::log($transactionData['id'].' - Value below 0');
             return false;
         }
 
         // The fee must be >=0
         if ($transactionData['fee'] < 0) {
-            $this->log->log($transactionData['id'].' - Fee below 0');
+            Log::log($transactionData['id'].' - Fee below 0');
             return false;
         }
 
@@ -316,37 +317,37 @@ class Transaction extends Model
         }
         // Added fee does not match
         if ($fee != $transactionData['fee']) {
-            $this->log->log($transactionData['id'].' - Fee not 0.25%');
+            Log::log($transactionData['id'].' - Fee not 0.25%');
             return false;
         }
 
         // Invalid destination address
         if (!$acc->valid($transactionData['dst'])) {
-            $this->log->log($transactionData['id'].' - Invalid destination address');
+            Log::log($transactionData['id'].' - Invalid destination address');
             return false;
         }
 
         // Reward transactions are not added via this function
         if ($transactionData['version'] < 1) {
-            $this->log->log($transactionData['id'].' - Invalid version <1');
+            Log::log($transactionData['id'].' - Invalid version <1');
             return false;
         }
 
         // Public key must be at least 15 chars / probably should be replaced with the validator function
         if (strlen($transactionData['public_key']) < 15) {
-            $this->log->log($transactionData['id'].' - Invalid public key size');
+            Log::log($transactionData['id'].' - Invalid public key size');
             return false;
         }
 
         // No transactions before the genesis
         if ($transactionData['date'] < 1511725068) {
-            $this->log->log($transactionData['id'].' - Date before genesis');
+            Log::log($transactionData['id'].' - Date before genesis');
             return false;
         }
 
         // No future transactions
         if ($transactionData['date'] > time() + 86400) {
-            $this->log->log($transactionData['id'].' - Date in the future');
+            Log::log($transactionData['id'].' - Date in the future');
             return false;
         }
 
@@ -366,14 +367,14 @@ class Transaction extends Model
                     && (strlen($xs) !== 62 || substr($transactionId, 2) !== $transactionData['id']))
                 || $height > 16900
             ) {
-                $this->log->log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
+                Log::log($transactionData['id'].' - '.$transactionId.' - Invalid hash');
                 return false;
             }
         }
 
         // Verify the ECDSA signature
         if (!$acc->checkSignature($transactionInfo, $transactionData['signature'], $transactionData['public_key'])) {
-            $this->log->log($transactionData['id'].' - Invalid signature');
+            Log::log($transactionData['id'].' - Invalid signature');
             return false;
         }
 
@@ -415,8 +416,8 @@ class Transaction extends Model
      */
     public function getTransaction(string $transactionId)
     {
-        $acc = new Account($this->config, $this->database);
-        $block = new Block($this->config, $this->database);
+        $acc = new Account($this->database);
+        $block = new Block($this->database);
         $current = $block->current();
 
         $transactionData = $this->database->row('SELECT * FROM transactions WHERE id = :id', [':id' => $transactionId]);
@@ -467,9 +468,9 @@ class Transaction extends Model
      */
     public function getTransactions($height = '', $transactionId = '')
     {
-        $block = new Block($this->config, $this->database);
+        $block = new Block($this->database);
         $current = $block->current();
-        $acc = new Account($this->config, $this->database);
+        $acc = new Account($this->database);
 
         $height = Helpers\Sanitise::alphanumeric($height);
         $transactionId = Helpers\Sanitise::alphanumeric($transactionId);

@@ -221,7 +221,7 @@ class Account extends Model
      */
     public function getTransactions(string $address, int $limit = 100): array
     {
-        $block = new Block($this->config, $this->database);
+        $block = new Block($this->database);
         $current = $block->current();
         $publicKey = $this->publicKey($address);
         $limit = intval($limit);
